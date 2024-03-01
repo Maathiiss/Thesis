@@ -184,19 +184,33 @@ void compare_methode(){
 
 
 
-    for (int bins=40 ; bins <=200; bins +=1){
-    TCanvas *c1 = new TCanvas("Histo compare","",1200,800);
-    TH1D *h1 = new TH1D("h1", "Difference between with and without alpha peak; Difference in %; Number of events", bins,-1,1);      
+    
+    TCanvas *c1 = new TCanvas("histo_compare","",1200,800);
+    c1->Divide(3,2);
+    std::vector<TH1D*> histograms(5);
+    
+    for (int i = 0; i < 5; ++i) {
+      std::string name = "h" + std::to_string(i+1);
+      std::string title = "Difference between with and without alpha peak for OM 71" + std::to_string(i+2) + "; Difference in %; Number of events";
+      histograms[i] = new TH1D(name.c_str(), title.c_str(), 30, -1, 1);
+    }
+    
+    int compteur2 =0;
     for(int i=0; i<n_run*5;i++){
       std::cout<<100*(gain_store.at(i)-gain_store1.at(i))/gain_store1.at(i)<<std::endl;
-      if(100*(gain_store.at(i)-gain_store1.at(i))/gain_store1.at(i)!=0){
-      h1->Fill(100*(gain_store.at(i)-gain_store1.at(i))/gain_store1.at(i));
+      
+      if (gain_store.at(i)==gain_store1.at(i)){//changement OM lorsque gain est = 1
+	compteur2++;
       }
+      if(100*(gain_store.at(i)-gain_store1.at(i))/gain_store1.at(i)!=0){
+	histograms[compteur2-1]->Fill(100*(gain_store.at(i)-gain_store1.at(i))/gain_store1.at(i));
+      }
+      std::cout<<"ici "<<compteur2<<endl;
+      c1->cd(compteur2);
+      histograms[compteur2-1]->Draw();
+
     }
-    c1->cd();
-    h1->Draw();
-    //c1->SaveAs(Form("Comparaison_bins_%d.png",bins));
-    }
+    c1->SaveAs("Comparaison.pdf");
 }
 
 
