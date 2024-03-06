@@ -761,7 +761,7 @@ void file_merger(std::vector<int> run_number, int run_number_pdf, string previou
       gain_error_moins = 0/*0.0009755*/;
       gain_error_plus = 0/*0.0009755*/;
       int_run = run_number_pdf;
-      time = time_pdf;
+      time = time_pdf/4;
       Result_tree.Fill();
     }
   }
@@ -866,10 +866,8 @@ void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string p
 
 
 
-void TGrapher(std::string file_name, int n_run) {
-  std::cout << "ok" << '\n';
+void TGrapher(std::string file_name, int n_run){
   TFile file(Form("sortie/root_file_final/TGraph_%s.root", file_name.c_str()), "RECREATE");
-
   TFile tree_file(Form("sortie/root_file_final/%s.root", file_name.c_str()), "READ");
   double time;
   int om_number, run_number;
@@ -928,7 +926,7 @@ void TGrapher(std::string file_name, int n_run) {
     mg[i]->GetXaxis()->SetTimeDisplay(1);
     mg[i]->GetXaxis()->SetTitle("Time");
     mg[i]->GetYaxis()->SetTitle("Gain evolution");
-    mg[i]->GetYaxis()->SetRangeUser(0.95, 1.05);
+    mg[i]->GetYaxis()->SetRangeUser(0.9, 1.01);
     mg[i]->GetYaxis()->SetTitleOffset(0.9);
     if(i==2){      
       mg[i]->Draw("AP");
@@ -990,9 +988,6 @@ void TGrapher(std::string file_name, int n_run) {
    for (int j = 0; j < n_run; j++){
      tree1->GetEntry(i+j*5);
      gain_store1.push_back(gain1);
-     if(i==2){
-       continue;
-     }
      yaxis[j] = gain1;
      yaxis_error_moins[j] = gain_error1/2;
      yaxis_error_plus[j] = gain_error1/2;
@@ -1000,15 +995,16 @@ void TGrapher(std::string file_name, int n_run) {
      xaxis_error_plus[j] = 0.00001;
      xaxis_error_moins[j] = 0.00001;
    }
+   if(i!=2){
    gain_graph[i] = new TGraphAsymmErrors(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
    gain_graph[i]->SetMarkerColor(kBlue);
    gain_graph[i]->SetMarkerStyle(5);
-   gain_graph[i]->SetMarkerSize(2);
-
-
+   gain_graph[i]->SetMarkerSize(2);   
    canvas->cd(i+1);
    mg[i]->Add(gain_graph[i]);
    mg[i]->Draw("AP");
+   }
+   canvas->cd(i+1);
    line_ref->Draw("same");
    line_ref_2->Draw("same");
    line_ref_1->Draw("same");
@@ -1038,12 +1034,12 @@ void TGrapher(std::string file_name, int n_run) {
  line_ref_leg->SetLineColor(2);
  line_ref_leg->SetLineWidth(1);
  line_ref_leg->SetLineStyle(2);
- legend->AddEntry(line_ref_leg, "gain = 1");
+ legend->AddEntry(line_ref_leg, "gain = 1","l");
  TLine *line_1_leg = new TLine(0, 0, 0, 0);
  line_1_leg->SetLineColor(kBlack);
  line_1_leg->SetLineWidth(1);
  line_1_leg->SetLineStyle(2);
- legend->AddEntry(line_1_leg, "#Delta gain = 1 %");
+ legend->AddEntry(line_1_leg, "#Delta gain = 1 %","l");
 
  file.cd();
  canvas->Update();
