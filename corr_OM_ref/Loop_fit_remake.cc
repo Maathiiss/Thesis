@@ -172,9 +172,8 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
   //can->SaveAs(Form("sortie/om_%d/run_%d/fit_run_%d_om_%d_gain_%f.png", om_number, run_number, run_number, om_number, gain));
   //}
 
-    //gSystem->mkdir(Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/graph interessant/Avec pic alpha/gif/om_%d", om_number));
-  //can->SaveAs(Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/graph interessant/Avec pic alpha/gif/om_%d/fit_run_%d_om_%d_gain_%f.png",om_number,run_number, om_number, gain));
-  
+  //gSystem->mkdir(Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/graph interessant/Avec pic alpha/gif/om_%d", om_number));
+    //can->SaveAs(Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/graph interessant/Avec pic alpha/gif/om_%d/fit_run_%d_om_%d_gain_%f.png",om_number,run_number, om_number, gain));
   // } 
 
 
@@ -186,7 +185,7 @@ double roofitter(TH1D* modele, TH1D* spectre_om, int om_number, double *rootab, 
 
 }
 
-void Fit_Ref(int run_number, int run_number_pdf) {
+void Fit_Ref(int run_number, int run_number_pdf, int bins) {
   Load_spectre(run_number);
   TH1::SetDefaultSumw2();
 
@@ -248,33 +247,13 @@ void Fit_Ref(int run_number, int run_number_pdf) {
       //canv->SaveAs("canv.png");
       //modele->SaveAs("test_2.root");
       
-      for (int i = 0; i < 25; i++) {  //mettre les 0 au debut
+      for (int i = 0; i < bins; i++) {  //mettre les 0 au debut
         modele->SetBinContent(i,0);
         modele->SetBinError(i, 0);
         spectre_om->SetBinContent(i,0);
         spectre_om->SetBinError(i, 0);
       }
       
-      /*
-      for (int i = 100; i < 1000; i++) {
-        modele->SetBinContent(i,0);
-        modele->SetBinError(i, 0);
-        spectre_om->SetBinContent(i,0);
-        spectre_om->SetBinError(i, 0);
-	}*/
-      // if (om_number == 716) {
-      /*
-      int k = 10;
-      //std::cout << " hauteur bin  :"<<k<<"  = " <<spectre_om->Integral(k, k) << '\n';
-      while (spectre_om->Integral(k, k) > 11000) {//enlever effets saturation ? Si hauteur du bin k est >11000 -> mis a 0
-        // for (int i = 0; i < 17; i++) {
-	modele->SetBinContent(k,0);
-	modele->SetBinError(k, 0);
-	spectre_om->SetBinContent(k,0);
-	spectre_om->SetBinError(k, 0);
-	k++;
-	compteur = k;
-	}*/
       std::cout << "/* message */" << '\n';
       // }
       spectre_om->Draw();
@@ -299,42 +278,20 @@ void Fit_Ref(int run_number, int run_number_pdf) {
 
     
     //recherche plus fine de chi2
-    for (int gain_count = gainmin - 400; gain_count < gainmin + 400; gain_count+=10) {
+    for (int gain_count = gainmin - 400; gain_count < gainmin + 400; gain_count+=1) {
       gain = (gain_bin_min + gain_bin_width*(gain_count-1));
       // if (gain < 1.01 && gain > 0.99) {
       modele = TH2modele->ProjectionY("modele", gain_count, gain_count);
       // modele->Draw();
       // spectre_om->Draw();
       
-      for (int i = 0; i < 25; i++) {
+      for (int i = 0; i < bins; i++) {
         modele->SetBinContent(i,0);
         modele->SetBinError(i, 0);
         spectre_om->SetBinContent(i,0);
         spectre_om->SetBinError(i, 0);
       }
       
-      //modifier range
-      /*
-      for (int i = 100; i < 1000; i++) {
-        modele->SetBinContent(i,0);
-        modele->SetBinError(i, 0);
-        spectre_om->SetBinContent(i,0);
-        spectre_om->SetBinError(i, 0);
-	}*/
-  
-      // if (om_number == 716) {
-      /*
-      int k = 10;
-      while (spectre_om->Integral(k, k) > 11000) {
-        // for (int i = 0; i < 17; i++) {
-        modele->SetBinContent(k,0);
-        modele->SetBinError(k, 0);
-        spectre_om->SetBinContent(k,0);
-        spectre_om->SetBinError(k, 0);
-        k++;
-	}*/
-      // }
-
       int compte = 0;
       for (int i = 0; i < 1000; i++) {
 	if (spectre_om->GetBinContent(i) > 0) {
@@ -356,12 +313,16 @@ void Fit_Ref(int run_number, int run_number_pdf) {
     // }
 
   }
-  TFile new_file(Form("sortie/root_file_final/Fit_Ref_%d.root", run_number), "RECREATE");
+  string fileadd = "";
+  if (bins == 55){
+    fileadd = "_bckg";
+  }
+
+  TFile new_file(Form("sortie/root_file_final/Fit_Ref_%d%s.root", run_number, fileadd.c_str()), "RECREATE");
   // TFile new_file(Form("root/Complete_Fit/Fit_Ref_%d.root", run_number), "RECREATE");
   new_file.cd();
   Result_tree.Write();
   new_file.Close();
-  std::cout << "file " << Form("Fit_Ref_%d.root", run_number) << " saved" << '\n';
   return;
 
 }
@@ -698,6 +659,11 @@ void minerror_calculator(string file_name, int run_number) {
     //can->SaveAs(Form("sortie/om_%d/run_%d/fit_Chi2_gain.root", i, run_number));
     can->SaveAs(Form("sortie/om_%d/fit_Chi2_gain_run_%d.png", i, run_number));
     std::cout<<Form("sortie/om_%d/run_%d/fit_Chi2_gain.png", i, run_number)<<"\n";
+      TFile *file_graph = new TFile("graph.root", "RECREATE");
+      Chi2gain->SetName("nom");
+      Chi2gain->Write();
+      file_graph->Close();
+
     
     Result_tree.Fill();
     delete Chi2gain;
@@ -711,8 +677,9 @@ void minerror_calculator(string file_name, int run_number) {
 }
 
 
-void file_merger(std::vector<int> run_number, int run_number_pdf, string previous_file_s = "") { 
-  TFile file(Form("sortie/root_file_final/Fit_Ref_%d-%d.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
+void file_merger(std::vector<int> run_number, int run_number_pdf, string previous_file_s = "", string bckg = "") {
+  TFile file(Form("sortie/root_file_final/Fit_Ref_%d-%d%s.root", run_number.at(0), run_number.at(run_number.size()-1),bckg.c_str()), "RECREATE");
+  //TFile file(Form("sortie/root_file_final/%s.root", bckg.c_str()), "RECREATE");
   // TFile file(Form("root/Merged_Fit/Fit_Ref_%d-%d.root", 736, 836), "RECREATE");
   double Chi2, gain, gain_error_plus, gain_error_moins, ndf;
   int om_number, int_run;
@@ -767,10 +734,11 @@ void file_merger(std::vector<int> run_number, int run_number_pdf, string previou
   }
 
   for (size_t i = 0; i < run_number.size(); i++) {
-    TFile tree_file(Form("sortie/root_file_final/Fit_Ref_%d_mini.root", run_number.at(i)), "READ");
-    std::cout<<"ici "<<Form("sortie/root_file_final/Fit_Ref_%d_mini.root", run_number.at(i))<<"\n";
+    TFile tree_file(Form("sortie/root_file_final/Fit_Ref_%d%s_mini.root", run_number.at(i), bckg.c_str()), "READ");
+    std::cout<<"ici "<<Form("sortie/root_file_final/Fit_Ref_%d%s_mini.root", run_number.at(i), bckg.c_str())<<"\n";
     std::cout << run_number.at(i) << '\n';
     TTree* tree = (TTree*)tree_file.Get("Result_tree");
+
     tree->SetBranchStatus("*",0);
     tree->SetBranchStatus("om_number",1);
     tree->SetBranchAddress("om_number", &om_number);
@@ -867,6 +835,9 @@ void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string p
 
 
 void TGrapher(std::string file_name, int n_run){
+  
+  /************************************************************************************************************************************************************************************************************************************************** WITH SHIFT METHOD TOTAL *********************************************************************************************************************************************************************************************************************************************************/
+  
   TFile file(Form("sortie/root_file_final/TGraph_%s.root", file_name.c_str()), "RECREATE");
   TFile tree_file(Form("sortie/root_file_final/%s.root", file_name.c_str()), "READ");
   double time;
@@ -899,9 +870,6 @@ void TGrapher(std::string file_name, int n_run){
   canvas->Divide(3,2);
   TGraphAsymmErrors *gain_graph[5]; //(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
   TMultiGraph *mg[5];
-
-  /**************************************************************************************************************************************************************************************************************************************************WITH SHIFT METHOD*****************************************************************************************************************************************************************************************************************************************************************/
-  
   file.cd();
   for (int i = 0; i < 5; i++) {
     mg[i] = new TMultiGraph();
@@ -926,7 +894,7 @@ void TGrapher(std::string file_name, int n_run){
     mg[i]->GetXaxis()->SetTimeDisplay(1);
     mg[i]->GetXaxis()->SetTitle("Time");
     mg[i]->GetYaxis()->SetTitle("Gain evolution");
-    mg[i]->GetYaxis()->SetRangeUser(0.9, 1.01);
+    mg[i]->GetYaxis()->SetRangeUser(0.9, 1.1);
     mg[i]->GetYaxis()->SetTitleOffset(0.9);
     if(i==2){      
       mg[i]->Draw("AP");
@@ -952,8 +920,57 @@ void TGrapher(std::string file_name, int n_run){
 
   canvas->Update();
 
+
+  /************************************************************************************************************************************************************************************************************************************************** WITH SHIFT METHOD BACKGROUND ONLY  *************************************************************************************************************************************************************************************************************************************************/
+
+TFile tree_file2(Form("sortie/root_file_final/%s_bckg.root", file_name.c_str()), "READ");
+  double time2;
+  int om_number2, run_number2;
+  double gain2;
+  double gain_error_moins2, gain_error_plus2;
+  vector<double> gain_store2;
+  TTree* tree2 = (TTree*)tree_file2.Get("Result_tree");
+  tree2->SetBranchStatus("*",0);
+  tree2->SetBranchStatus("om_number",1);
+  tree2->SetBranchAddress("om_number", &om_number2);
+  tree2->SetBranchStatus("gain",1);
+  tree2->SetBranchAddress("gain", &gain2);
+  tree2->SetBranchStatus("gain_error_moins",1);
+  tree2->SetBranchAddress("gain_error_moins", &gain_error_moins2);
+  tree2->SetBranchStatus("gain_error_plus",1);
+  tree2->SetBranchAddress("gain_error_plus", &gain_error_plus2);
+  tree2->SetBranchStatus("run_number",1);
+  tree2->SetBranchAddress("run_number", &run_number2);
+  tree2->SetBranchStatus("time",1);
+  tree2->SetBranchAddress("time", &time2);
+    for (int i = 0; i < 5; i++) {
+      for (int j = 0; j < n_run; j++){
+        tree2->GetEntry(i+j*5);
+        yaxis[j] = gain2;
+        gain_store2.push_back(gain);
+        yaxis_error_moins[j] = gain_error_moins2;
+        yaxis_error_plus[j] = gain_error_plus2;
+	xaxis[j] = time2;
+        xaxis_error_plus[j] = 0.00001;
+        xaxis_error_moins[j] = 0.00001;
+    }
+        gain_graph[i] = new TGraphAsymmErrors(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
+        gain_graph[i]->SetMarkerColor(kMagenta-4);
+        gain_graph[i]->SetMarkerStyle(5);
+        gain_graph[i]->SetMarkerSize(2);
+        canvas->cd(i+1);
+        mg[i]->Add(gain_graph[i]);
+        mg[i]->Draw("AP");
+    }
+    canvas->Update();
+ 
+
+
+
+
 /**************************************************************************************************************************************************************************************************************************************************WITH FIT ALPHA PIC METHOD***********************************************************************************************************************************************************************************************************************************************************/
- TFile tree_file1(Form("sortie/root_file_final/alpha_fit/%s_alpha.root", file_name.c_str()), "READ");
+
+  TFile tree_file1(Form("sortie/root_file_final/alpha_fit/%s_alpha.root", file_name.c_str()), "READ");
  double time1;
  int om_number1, run_number1;
  double gain1;
@@ -971,15 +988,17 @@ void TGrapher(std::string file_name, int n_run){
  tree1->SetBranchAddress("run_number", &run_number1);
  tree1->SetBranchStatus("time",1);
  tree1->SetBranchAddress("time", &time1);
-  TLine* line_ref = new TLine(xaxis[0],1,xaxis[n_run-1],1);
+ double xaxis_min = *std::min_element(xaxis, xaxis+n_run);
+ double xaxis_max = *std::max_element(xaxis, xaxis+n_run);
+  TLine* line_ref = new TLine(xaxis_min,1,xaxis_max,1);
   line_ref->SetLineWidth(1);
   line_ref->SetLineStyle(2); 
   line_ref->SetLineColor(2);
-  TLine* line_ref_1 = new TLine(xaxis[0],1.01,xaxis[n_run-1],1.01);
+  TLine* line_ref_1 = new TLine(xaxis_min,1.01,xaxis_max,1.01);
   line_ref_1->SetLineWidth(1);
   line_ref_1->SetLineStyle(2);
   line_ref_1->SetLineColor(kBlack);
-  TLine* line_ref_2 = new TLine(xaxis[0],0.99,xaxis[n_run-1],0.99);
+  TLine* line_ref_2 = new TLine(xaxis_min,0.99,xaxis_max,0.99);
   line_ref_2->SetLineWidth(1);
   line_ref_2->SetLineStyle(2);
   line_ref_2->SetLineColor(kBlack);
@@ -1019,11 +1038,21 @@ void TGrapher(std::string file_name, int n_run){
  line->SetLineColor(2);
  line->SetLineWidth(2);
  line->Draw(); 
- legend->AddEntry(marker, "with pdf shift", "lp");
+ legend->AddEntry(marker, "with pdf shift total", "lp");
+ TMarker *marker2 = new TMarker();
+ marker2->SetMarkerColor(kMagenta-4);
+ marker2->SetMarkerStyle(5);
+ marker2->SetMarkerSize(2);
+ TLine *line2 = new TLine(0, 0, 0, 0);
+ line2->SetLineColor(kMagenta-4);
+ line2->SetLineWidth(2);
+ line2->Draw();
+ legend->AddEntry(marker2, "with pdf shift background only", "lp");
  TMarker *marker1 = new TMarker();
  marker1->SetMarkerColor(kBlue);
  marker1->SetMarkerStyle(5);
  marker1->SetMarkerSize(2);
+
  TLine *line1 = new TLine(0, 0, 0, 0);
  line1->SetLineColor(2);
  line1->SetLineWidth(2);
@@ -1045,6 +1074,11 @@ void TGrapher(std::string file_name, int n_run){
  canvas->Update();
  canvas->Write();
  file.Close();
+
+
+
+
+
 
  
  TCanvas *c1 = new TCanvas("histo_compare","",1200,800);
@@ -1203,7 +1237,7 @@ int main(int argc, char const *argv[]) {
     std::cout << "Code start running" << '\n';
 
     for (int i = 0; i < n_run; i++) {
-      Fit_Ref(run_number.at(i),run_number_pdf);
+      Fit_Ref(run_number.at(i),run_number_pdf, 25);
       minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
     }
     std::cout << "Fit_Ref ok and minerror ok" << '\n';
@@ -1229,16 +1263,31 @@ int main(int argc, char const *argv[]) {
     }
     std::cout << "Code start running" << '\n';
     for (int i = 0; i < n_run; i++) {
-      Fit_Ref(run_number.at(i),run_number_pdf);
-      cout << Form("Fit_Ref_%d", run_number.at(i)) << endl;
+      //total shift
+      Fit_Ref(run_number.at(i),run_number_pdf, 25);
+      cout << Form("Fit_Ref_%d", run_number.at(i)) << endl;      
       minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+
+      //without alpha pic shift
+      Fit_Ref(run_number.at(i),run_number_pdf, 55);
+      cout << Form("Fit_Ref_%d", run_number.at(i)) << endl;
+      minerror_calculator(Form("Fit_Ref_%d_bckg", run_number.at(i)), run_number.at(i));
+
+      //alpha pic
       Fit_alpha_pdf(run_number_pdf); //to have the first value of the pic alpha
       Fit_alpha(run_number.at(i),run_number_pdf);
     }
+
+    
     std::cout << "Fit_Ref and minerror ok" << '\n';
     //
-    file_merger(run_number,run_number_pdf);
+    file_merger(run_number,run_number_pdf,"","");
     std::cout << "file_merger ok" << '\n';
+    
+    string bckg = "_bckg";
+    file_merger(run_number,run_number_pdf,"",bckg);
+    std::cout << "file_merger bckg ok" << '\n';
+    
     file_merger_alpha(run_number,run_number_pdf);
     std::cout << "file_merger_alpha ok" << '\n';
     //
