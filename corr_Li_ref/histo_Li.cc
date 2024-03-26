@@ -158,11 +158,10 @@ double* Ref_corrector(int run, string correction, double *gain_tab, double *gain
 
   int compteur = 0;
   for (int i = 0; i < tree->GetEntries(); i++) {
-    tree->GetEntry(i);
-    
+    tree->GetEntry(i);    
     //mettre abs ici ???
     if (run_number == run+1) {//pour associer run correction avec LI
-      std::cout<<" RUN FIT REF  "<<run_number<<" RUN LI  "<< run<<"\n";
+      //std::cout<<" RUN FIT REF  "<<run_number<<" RUN LI  "<< run<<"\n";
       gain_tab[compteur] = gain;
       gain_tab_error[compteur] = gain_error;
       compteur++;
@@ -247,56 +246,185 @@ int bundle_number(int om_number){//associer un numero d'OM a un bundle
 
 
 
-void Li_corrector(int run, double gain_tab, int run_ref) { //recup run LI de ref et rempli tableau gain avec -> permet de corriger les OMs du calo de la variation de lumiere
+void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
+  double Amplitude, Amplitude_error, Amplitude_corr, Amplitude_corr_error, Khi2, time, gain, gain_error;
+  int om_number, run_number, pic,bundle_ref;
+  string wall;
+  TFile *file_sortie = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/final_gain_%d-%d.root",start,stop),"RECREATE");
+  std::cout<<"file create "<<Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/final_gain_%d-%d.root",start,stop)<<std::endl;
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("pic", &pic);
+  Result_tree.Branch("Amplitude", &Amplitude);
+  Result_tree.Branch("Amplitude_error", &Amplitude_error);
+  // Result_tree.Branch("Amplitude_corr", &Amplitude_corr);
+  // Result_tree.Branch("Amplitude_corr_error", &Amplitude_corr_error);
+  Result_tree.Branch("run_number", &run_number);
+  Result_tree.Branch("gain",&gain);
+  Result_tree.Branch("gain_error",&gain_error);
+  Result_tree.Branch("bundle_ref",&bundle_ref);
+  
+  double amp_scor[5][8][n_run];
+  double amp_scor_error[5][8][n_run];
+  double amp_cor[5][8][n_run];
+  double amp_cor_error[5][8][n_run];
+  int bundle_ref_vec[5][8][n_run];
 
-  // TFile file(Form("root/Merged_Ref/Fit_Ref_%s.root", correction.c_str()), "READ");
-  TFile file(Form("sortie/ref_Li/Fit_Ampl_Ref/Amplitude_Li_run_%d.root", run), "READ");
-  std::cout<<"run open"<<Form("sortie/ref_Li/Fit_Ampl_Ref/Amplitude_Li_run_%d.root", run)<<std::endl;
-  std::cout<<"run"<<run<<"run ref"<<run_ref<<std::endl;
-  if (run == run_ref) {
-    for (int i = 0; i < 40; i++) {
-      //gain_tab[i] = 1;
+  TFile *file = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/Merged_Fit_%d-%d.root",start,stop), "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("om_number",1);
+  tree->SetBranchAddress("om_number", &om_number);
+  tree->SetBranchStatus("pic",1);
+  tree->SetBranchAddress("pic", &pic);
+  tree->SetBranchStatus("Khi2",1);
+  tree->SetBranchAddress("Khi2", &Khi2);
+  tree->SetBranchStatus("Amplitude",1);
+  tree->SetBranchAddress("Amplitude", &Amplitude);
+  tree->SetBranchStatus("Amplitude_error",1);
+  tree->SetBranchAddress("Amplitude_error", &Amplitude_error);
+  tree->SetBranchStatus("Amplitude_corr",1);
+  tree->SetBranchAddress("Amplitude_corr", &Amplitude_corr);
+  tree->SetBranchStatus("Amplitude_corr_error",1);
+  tree->SetBranchAddress("Amplitude_corr_error", &Amplitude_corr_error);
+  tree->SetBranchStatus("run_number",1);
+  tree->SetBranchAddress("run_number", &run_number);
+  tree->SetBranchStatus("time",1);
+  tree->SetBranchAddress("time", &time);
+  tree->SetBranchStatus("bundle_ref",1);
+  tree->SetBranchAddress("bundle_ref", &bundle_ref);
+
+  int scompteur = 0;
+  int srun = start;
+   for (int i = 0; i < tree->GetEntries(); i++) {
+    tree->GetEntry(i);
+    if (run_number != srun) {
+      scompteur++;
+      srun = run_number;
     }
+    if(pic<5){
+      wall = "IT";
+    }
+    else if(pic>=5){
+      wall = "FR";
+    }
+    amp_cor[om_number -712][pic-1][scompteur] = Amplitude_corr;
+    amp_cor_error[om_number -712][pic-1][scompteur] = Amplitude_corr_error;
+    amp_scor[om_number -712][pic-1][scompteur] = Amplitude;
+    amp_scor_error[om_number -712][pic-1][scompteur] = Amplitude_error;
+    bundle_ref_vec[om_number -712][pic-1][scompteur] = bundle_ref;
+
   }
-  else{
-    int run_number, pic, om_number;
-    double Amplitude;
-    //double ref_gain_tab[40];
-    string* wall;
-    TTree* tree = (TTree*)file.Get("Result_tree");
-    tree->SetBranchStatus("*",0);
-    tree->SetBranchStatus("Amplitude",1);
-    tree->SetBranchAddress("Amplitude", &Amplitude);
-    tree->SetBranchStatus("run_number",1);
-    tree->SetBranchAddress("run_number", &run_number);
-    tree->SetBranchStatus("pic",1);
-    tree->SetBranchAddress("pic", &pic);
-    tree->SetBranchStatus("om_number",1);
-    tree->SetBranchAddress("om_number", &om_number);
-    tree->SetBranchStatus("wall",1);
-    tree->SetBranchAddress("wall", &wall);
-    
-    for (int i = 0; i < tree->GetEntries(); i++) {
-      tree->GetEntry(i);
-      if (run_number == run) {
-	std::cout<<"bundle"<<Ref_bundle_number(om_number, *wall)<<std::endl;
-	std::cout<<"indice"<<Ref_bundle_number(om_number, *wall)*pic<<std::endl;
-	//std::cout<<"ref gain tab"<<ref_gain_tab[Ref_bundle_number(om_number, *wall)*pic]<<std::endl;
-	//std::cout<<"gain tab"<<gain_tab[Ref_bundle_number(om_number, *wall)*pic]<<std::endl;
-        //gain_tab[Ref_bundle_number(om_number, *wall)] = Amplitude/ref_gain_tab[Ref_bundle_number(om_number, *wall)];
+
+   for (int l = 0; l < n_run; l++) {//run num
+    for (int i = 0; i < 5; i++) {//om num    
+      for (int j = 0; j < 8; j++) {//pic num      
+          gain =  amp_cor[i][j][l]/amp_cor[i][j][0];	  
+	  gain_error = gain * sqrt((amp_cor_error[i][j][l]/amp_cor[i][j][l])*(amp_cor_error[i][j][l]/amp_cor[i][j][l]) + (amp_cor_error[i][j][0]/amp_cor[i][j][0])*(amp_cor_error[i][j][0]/amp_cor[i][j][0]));
+	  if(l==0){gain_error = 0;}
+          om_number = i+712;
+          pic = j+1;
+	  if(j>3){pic =j-3;}
+          run_number = run[l];
+          Amplitude = amp_scor[i][j][l];
+	  Amplitude_error = amp_scor_error[i][j][l];
+          Amplitude_corr = amp_cor[i][j][l];
+	  Amplitude_corr_error = amp_cor_error[i][j][l];
+	  bundle_ref = bundle_ref_vec[i][j][l];
+          Result_tree.Fill();        
       }
     }
   }
-  file.Close();
-  return;
+  file_sortie->cd();
+  Result_tree.Write();
+  file_sortie->Close();
 }
 
 
 
 
 
+void applied_Li_correction(std::vector<int> run, int n_run, int start, int stop){
 
-//TH1D histograms[712][4];
+  int run_number_ref, pic_ref, bundle_ref;
+  double Amplitude, Amplitude_error, Amplitude_corr, Amplitude_corr_error, Khi2, time, gain, gain_error;
+  int om_number, run_number, pic, bundle;
+
+  TFile *file_sortie = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/final_final_gain_%d-%d.root",start,stop),"RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number", &om_number);
+  Result_tree.Branch("pic", &pic);
+  Result_tree.Branch("Amplitude", &Amplitude);
+  Result_tree.Branch("Amplitude_error", &Amplitude_error);
+  Result_tree.Branch("Amplitude_corr", &Amplitude_corr);
+  Result_tree.Branch("Amplitude_corr_error", &Amplitude_corr_error);  
+  Result_tree.Branch("run_number", &run_number);
+  Result_tree.Branch("gain",&gain);
+  Result_tree.Branch("gain_error",&gain_error);
+  Result_tree.Branch("bundle",&bundle);
+  Result_tree.Branch("time",&time);
+
+
+  
+  //READ REF
+ TFile *file = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/final_gain_%d-%d.root",start,stop), "READ");
+  TTree* tree = (TTree*)file->Get("Result_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("pic",1);
+  tree->SetBranchAddress("pic", &pic_ref);
+  tree->SetBranchStatus("bundle_ref",1);
+  tree->SetBranchAddress("bundle_ref", &bundle_ref);
+  tree->SetBranchStatus("run_number",1);
+  tree->SetBranchAddress("run_number", &run_number_ref);
+  tree->SetBranchStatus("gain_error",1);
+  tree->SetBranchAddress("gain_error", &gain_error);
+  tree->SetBranchStatus("gain",1);
+  tree->SetBranchAddress("gain", &gain);
+
+
+  TFile file_cor(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Merged_Fit_%d-%d.root",start,stop), "READ");
+  TTree* tree_cor = (TTree*)file_cor.Get("Result_tree");
+  tree_cor->SetBranchStatus("*",0);
+  tree_cor->SetBranchStatus("Amplitude",1);
+  tree_cor->SetBranchAddress("Amplitude", &Amplitude);
+  tree_cor->SetBranchStatus("Amplitude_error",1);
+  tree_cor->SetBranchAddress("Amplitude_error", &Amplitude_error);
+  tree_cor->SetBranchStatus("Khi2",1);
+  tree_cor->SetBranchAddress("Khi2", &Khi2);
+  tree_cor->SetBranchStatus("run_number",1);
+  tree_cor->SetBranchAddress("run_number", &run_number);
+  tree_cor->SetBranchStatus("om_number",1);
+  tree_cor->SetBranchAddress("om_number", &om_number);
+  tree_cor->SetBranchStatus("pic",1);
+  tree_cor->SetBranchAddress("pic", &pic);
+  tree_cor->SetBranchStatus("time",1);
+  tree_cor->SetBranchAddress("time", &time);
+
+  tree_cor->SetBranchStatus("bundle",1);
+  tree_cor->SetBranchAddress("bundle", &bundle);
+
+  for (int j = 0; j < tree_cor->GetEntries(); j++) {
+    tree_cor->GetEntry(j);    
+    for (int i = 0; i < tree->GetEntries(); i++) {
+      tree->GetEntry(i);
+      //std::cout<<"i = "<< i << " j = "<<j<<std::endl;
+      //std::cout<<"bundle " << bundle << " bundle ref "<<bundle_ref<<std::endl;
+      if(pic_ref == pic && run_number == run_number_ref && bundle_ref == bundle){
+	// std::cout<<"run FIND" << run_number << " run ref "<<run_number_ref<<std::endl;
+	// std::cout<<"bundle FIND" << bundle << " bundle ref "<<bundle_ref<<std::endl;
+	// std::cout<<"pic FIND" << pic << " pic ref "<<pic_ref<<std::endl;
+	Amplitude_corr = Amplitude / gain;
+	Amplitude_corr_error =  Amplitude_corr * sqrt(pow(Amplitude_error/Amplitude,2) + pow(gain_error/gain,2));
+	Result_tree.Fill();
+      }
+    }
+  }
+  file_sortie->cd();
+  Result_tree.Write();
+  file_sortie->Close();
+}
+
+
 
 
 void fit_LI_amplitude(int run_number, double *correction_gain_table){ //pour tout le calo
@@ -305,7 +433,7 @@ void fit_LI_amplitude(int run_number, double *correction_gain_table){ //pour tou
   gStyle->SetOptStat(1);
   TH1::SetDefaultSumw2();
   TH2::SetDefaultSumw2();
-  string wall="";
+  string wall=""; 
   TFile file(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number),"RECREATE");
   std::cout<<"file open "<<Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number)<<std::endl;
   
@@ -493,7 +621,9 @@ void fit_LI_amplitude(int run_number, double *correction_gain_table){ //pour tou
 	constante = (f_Gaus->GetParameter(0));
 	mean = (f_Gaus->GetParameter(1));
 	sigma = (f_Gaus->GetParameter(2));
-	mean_error = f_Gaus->GetParError(1) ;
+	mean_error = f_Gaus->GetParError(1);
+	
+	
 	bundle = bundle_number(om_number);
 	//intensity = intensity_chooser(pic);
 	histograms[om_number][j]->GetXaxis()->SetRangeUser(mean-10*sigma,mean+10*sigma);
@@ -636,7 +766,7 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
     {
       for (size_t j = 1; j <  interval.size(); j++) 
 	{//boucle pour selection side
-	  std::cout<<"SIDE = "<<j<<" size "<< interval.size()<<std::endl;
+	  //std::cout<<"SIDE = "<<j<<" size "<< interval.size()<<std::endl;
 	  wall = "IT";
 	  if (j > interval.size()/2) {
 	    wall = "FR";
@@ -756,6 +886,9 @@ void file_merger_tot(std::vector<int> run){
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("time", &time);
   Result_tree.Branch("bundle", &bundle);
+  Result_tree.Branch("Amplitude_corr", &Amplitude_corr);
+  Result_tree.Branch("Amplitude_corr_error", &Amplitude_corr_error);
+
  
   for (size_t j = 0; j < run.size(); j++) {
     TFile *file1 = new TFile(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root",run[j]), "READ");    
@@ -775,6 +908,8 @@ void file_merger_tot(std::vector<int> run){
     tree->SetBranchAddress("run_number", &run_number);
     tree->SetBranchStatus("time",1);
     tree->SetBranchAddress("time", &time);
+    tree->SetBranchStatus("bundle",1);
+    tree->SetBranchAddress("bundle", &bundle);
     
     for (int i = 0; i < tree->GetEntries(); i++) {
       tree->GetEntry(i);
@@ -811,7 +946,7 @@ void file_merger(std::vector<int> run, int ref = 0, string addfile = "",string c
   Result_tree.Branch("Amplitude_corr_error", &Amplitude_corr_error);
   Result_tree.Branch("bundle_ref", &bundle_ref);
     
-  std::cout<< "size ="<< run.size();
+  //  std::cout<< "size ="<< run.size();
   for (size_t j = 0; j < run.size(); j++) {
     TFile *file1 = new TFile(Form("sortie/ref_Li/Fit_Ampl_Ref/Amplitude_Li_%srun_%d%s.root", cut.c_str(), run[j],corr.c_str()), "READ");
     TTree* tree = (TTree*)file1->Get("Result_tree");
@@ -848,33 +983,6 @@ void file_merger(std::vector<int> run, int ref = 0, string addfile = "",string c
   Khi2 = 0;
   Amplitude = 0;
   Amplitude_error = 0;
-
-  if (addfile.compare("") != 0) {
-    TFile *file1 = new TFile(Form("sortie/ref_Li/%s.root", addfile.c_str()), "READ");
-    TTree* tree = (TTree*)file1->Get("Result_tree");
-    tree->SetBranchStatus("*",0);
-    tree->SetBranchStatus("om_number",1);
-    tree->SetBranchAddress("om_number", &om_number);
-    tree->SetBranchStatus("pic",1);
-    tree->SetBranchAddress("pic", &pic);
-    tree->SetBranchStatus("Khi2",1);
-    tree->SetBranchAddress("Khi2", &Khi2);
-    tree->SetBranchStatus("Amplitude",1);
-    tree->SetBranchAddress("Amplitude", &Amplitude);
-    tree->SetBranchStatus("Amplitude_error",1);
-    tree->SetBranchAddress("Amplitude_error", &Amplitude_error);
-    tree->SetBranchStatus("run_number",1);
-    tree->SetBranchAddress("run_number", &run_number);
-    tree->SetBranchStatus("time",1);
-    tree->SetBranchAddress("time", &time);
-
-    
-    for (int i = 0; i < tree->GetEntries(); i++) {
-      tree->GetEntry(i);
-      Result_tree.Fill();
-    }
-    file1->Close();
-  }
 
   TFile *newfile = new TFile(Form("sortie/ref_Li/Fit_Ampl_Ref/Merged_Fit_%d-%d%s.root",run[0],run[run.size()-1],corr.c_str()), "RECREATE");
   std::cout << "file saved : " << Form("sortie/ref_Li/Fit_Ampl_Ref/Merged_Fit_%d-%d.root",run[0],run[run.size()-1])<< '\n';
@@ -1014,7 +1122,7 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
       amp_scor_error[om_number -712][pic-1][scompteur] = Amplitude_error;
     }
     else if(wall=="FR" && pic>=5){
-      cout << "om " << om_number << " -> pic " << pic-5 << " run " << std::endl;
+      //cout << "om " << om_number << " -> pic " << pic-5 << " run " << std::endl;
       amp_cor[om_number -712][pic-5][scompteur] = Amplitude_corr;
       amp_cor_error[om_number -712][pic-5][scompteur] = Amplitude_corr_error;      
       amp_scor[om_number -712][pic-5][scompteur] = Amplitude;
@@ -1036,7 +1144,6 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
           norm_amp_cor_error[i][j][l] = sqrt(pow(amp_cor_error[i][j][l]/amp_cor[i][j][0],2) + pow(amp_cor[i][j][l]*amp_cor_error[i][j][0]/pow(amp_cor[i][j][0],2),2));
 	  norm_amp_scor[i][j][l] = amp_scor[i][j][l]/amp_scor[i][j][0];
           norm_amp_scor_error[i][j][l] = sqrt(pow(amp_scor_error[i][j][l]/amp_scor[i][j][0],2) + pow(amp_scor[i][j][l]*amp_scor_error[i][j][0]/pow(amp_scor[i][j][0],2),2));
-
         }
       }
     }
@@ -1193,19 +1300,19 @@ void Evolution_Li_SN_graph(int n_run, int start, int stop){//comparaison graph c
   TFile *file_sortie = new TFile("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/sortie.root","RECREATE");
 
   std::cout<<"file open "<<Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Merged_Fit_%d-%d.root",start,stop)<<std::endl;
-  TFile file_cor(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Merged_Fit_%d-%d.root",start,stop), "READ");
+  TFile file_cor(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/final_final_gain_%d-%d.root",start,stop), "READ");
   TTree* tree_cor = (TTree*)file_cor.Get("Result_tree");
   tree_cor->SetBranchStatus("*",0);
   tree_cor->SetBranchStatus("Amplitude",1);
   tree_cor->SetBranchAddress("Amplitude", &Amplitude);
   tree_cor->SetBranchStatus("Amplitude_error",1);
   tree_cor->SetBranchAddress("Amplitude_error", &Amplitude_error);
-  // tree_cor->SetBranchStatus("Amplitude_corr",1);
-  // tree_cor->SetBranchAddress("Amplitude_corr", &Amplitude_corr);
-  // tree_cor->SetBranchStatus("Amplitude_corr_error",1);
-  // tree_cor->SetBranchAddress("Amplitude_corr_error", &Amplitude_corr_error);
-  tree_cor->SetBranchStatus("Khi2",1);
-  tree_cor->SetBranchAddress("Khi2", &Khi2);
+  tree_cor->SetBranchStatus("Amplitude_corr",1);
+  tree_cor->SetBranchAddress("Amplitude_corr", &Amplitude_corr);
+  tree_cor->SetBranchStatus("Amplitude_corr_error",1);
+  tree_cor->SetBranchAddress("Amplitude_corr_error", &Amplitude_corr_error);
+  // tree_cor->SetBranchStatus("Khi2",1);
+  // tree_cor->SetBranchAddress("Khi2", &Khi2);
   tree_cor->SetBranchStatus("run_number",1);
   tree_cor->SetBranchAddress("run_number", &run_number);
   tree_cor->SetBranchStatus("om_number",1);
@@ -1227,10 +1334,9 @@ void Evolution_Li_SN_graph(int n_run, int start, int stop){//comparaison graph c
       scompteur++;
       srun = run_number;
       time_vec[scompteur]=time;
-    }
-   
-      // amp_cor[om_number][pic-1][scompteur] = Amplitude_corr;
-      // amp_cor_error[om_number][pic-1][scompteur] = Amplitude_corr_error;
+    }   
+      amp_cor[om_number][pic-1][scompteur] = Amplitude_corr;
+      amp_cor_error[om_number][pic-1][scompteur] = Amplitude_corr_error;
       amp_scor[om_number][pic-1][scompteur] = Amplitude;
       amp_scor_error[om_number][pic-1][scompteur] = Amplitude_error;    
   }  
@@ -1244,8 +1350,8 @@ void Evolution_Li_SN_graph(int n_run, int start, int stop){//comparaison graph c
     for (int j = 0; j < 4; j++) {//pic num
       for (int l = 0; l < n_run; l++) {//run num
         if (amp_scor[i][j][0] > 0.1 /*&& amp_cor[i][j][0] > 0.1*/) {
-          //norm_amp_cor[i][j][l] = amp_cor[i][j][l]/amp_cor[i][j][0];
-          //norm_amp_cor_error[i][j][l] = sqrt(pow(amp_cor_error[i][j][l]/amp_cor[i][j][0],2) + pow(amp_cor[i][j][l]*amp_cor_error[i][j][0]/pow(amp_cor[i][j][0],2),2));
+          norm_amp_cor[i][j][l] = amp_cor[i][j][l]/amp_cor[i][j][0];
+          norm_amp_cor_error[i][j][l] = sqrt(pow(amp_cor_error[i][j][l]/amp_cor[i][j][0],2) + pow(amp_cor[i][j][l]*amp_cor_error[i][j][0]/pow(amp_cor[i][j][0],2),2));
 	  norm_amp_scor[i][j][l] = amp_scor[i][j][l]/amp_scor[i][j][0];
           norm_amp_scor_error[i][j][l] = sqrt(pow(amp_scor_error[i][j][l]/amp_scor[i][j][0],2) + pow(amp_scor[i][j][l]*amp_scor_error[i][j][0]/pow(amp_scor[i][j][0],2),2));
         }
@@ -1285,13 +1391,13 @@ void Evolution_Li_SN_graph(int n_run, int start, int stop){//comparaison graph c
       double syaxis[n_run];
       double syaxis_error[n_run];
       for (int l = 0; l < n_run; l++) {
-        if (/*norm_amp_cor[i][j][l] >0.1 &&*/ norm_amp_scor[i][j][l] > 0.1) {
-	  //yaxis_amp[l] = amp_cor[i][j][l] - amp_cor[i][j][0];	  
-	  //yaxis_error_amp[l] = sqrt(amp_cor_error[i][j][l]*amp_cor_error[i][j][l] + amp_cor_error[i][j][0] * amp_cor_error[i][j][0]);
+        if (norm_amp_cor[i][j][l] >0.1 && norm_amp_scor[i][j][l] > 0.1) {
+	  yaxis_amp[l] = amp_cor[i][j][l] - amp_cor[i][j][0];	  
+	  yaxis_error_amp[l] = sqrt(amp_cor_error[i][j][l]*amp_cor_error[i][j][l] + amp_cor_error[i][j][0] * amp_cor_error[i][j][0]);
 	  yaxis_samp[l] = amp_scor[i][j][l] - amp_scor[i][j][0];
 	  yaxis_error_samp[l] = sqrt(amp_scor_error[i][j][l]*amp_scor_error[i][j][l] + amp_scor_error[i][j][0]*amp_scor_error[i][j][0]);
-          //yaxis[l] = norm_amp_cor[i][j][l];
-          //yaxis_error[l] = norm_amp_cor_error[i][j][l];	
+          yaxis[l] = norm_amp_cor[i][j][l];
+          yaxis_error[l] = norm_amp_cor_error[i][j][l];	
           syaxis[l] = norm_amp_scor[i][j][l];
           syaxis_error[l] = norm_amp_scor_error[i][j][l];
 	  //std::cout<<"var scor"<<norm_amp_scor[i][j][l]<<" var samp "<<amp_scor[i][j][l] - amp_scor[i][j][0]<<std::endl;
@@ -1299,32 +1405,33 @@ void Evolution_Li_SN_graph(int n_run, int start, int stop){//comparaison graph c
       }
 
       TGraphErrors *variation_scor = new TGraphErrors(n_run, xaxis, syaxis, xaxis_error, syaxis_error);
-      //TGraphErrors *variation_cor = new TGraphErrors(n_run, xaxis, yaxis, xaxis_error, yaxis_error);
-      //TGraphErrors *variation_amp = new TGraphErrors(n_run, xaxis, yaxis_amp, xaxis_error, yaxis_error_amp);
+      TGraphErrors *variation_cor = new TGraphErrors(n_run, xaxis, yaxis, xaxis_error, yaxis_error);
+      TGraphErrors *variation_amp = new TGraphErrors(n_run, xaxis, yaxis_amp, xaxis_error, yaxis_error_amp);
       TGraphErrors *variation_samp = new TGraphErrors(n_run, xaxis, yaxis_samp, xaxis_error, yaxis_error_samp);
     
-      // variation_amp->SetLineColor(color[j+1]);
-      // variation_amp->SetLineWidth(2);
+      variation_amp->SetLineColor(color[j+1]);
+      variation_amp->SetLineWidth(2);
       variation_samp->SetLineColor(color[j+1]);
       variation_samp->SetLineStyle(2);
       variation_samp->SetLineWidth(2);
-      variation_samp->SetTitle(Form("Intensity %d", j+1));
-
-      //variation_amp->Draw("APL"/*"same"*/);
+      variation_samp->SetTitle(Form("#Delta Q Intensity %d", j+1));
+      variation_amp->SetTitle(Form("#Delta #alpha Intensity %d", j+1));
+      variation_amp->Draw("APL"/*"same"*/);
       variation_samp->Draw("APL"/*"same"*/);
       variation_scor->SetLineColor(color[j+1]);
       variation_scor->SetLineStyle(2);
       variation_scor->SetLineWidth(2);
-      variation_scor->SetTitle(Form("Intensity %d", j+1));
-      // variation_cor->SetLineColor(color[j+1]);
-      // variation_cor->SetLineWidth(2);
+      variation_scor->SetTitle(Form("#Delta Q Intensity %d", j+1));
+      variation_cor->SetLineColor(color[j+1]);
+      variation_cor->SetLineWidth(2);
+      variation_cor->SetTitle(Form("#Delta #alpha Intensity %d", j+1));
       
 
-      //variation_cor->Draw("APL"/*"same"*/);
+      variation_cor->Draw("APL"/*"same"*/);
       variation_scor->Draw("APL"/*"same"*/);
-      //multiGraph->Add(variation_cor);
+      multiGraph->Add(variation_cor);
       multiGraph->Add(variation_scor);
-      //multiGraph_amp->Add(variation_amp);
+      multiGraph_amp->Add(variation_amp);
       multiGraph_amp->Add(variation_samp);
     
     }//boucle j
@@ -1456,19 +1563,18 @@ int main(int argc, char const *argv[]){
   
    double gain_tab[40];  //correction lumiere par OM ref
    for (size_t i = 0; i < run_number.size(); i++) {
-
-     //Li_corrector(run_number[i], gain_tab, run_number[0]);  //rempli le tableau
-     std::cout<<"Li corrector ok"<<std::endl;
-     for(int i=0;i<40;i++){
-       std::cout<<"gain"<<gain_tab[i]<<std::endl;
-     }
      fit_LI_amplitude(run_number[i], gain_tab);
-     std::cout<<"end"<<std::endl;
+     std::cout<<"fit_LI_amplitude ok"<<std::endl;
    }
    //std::cout<<"ICI"<<run_number[0]<<" "<<run_number[run_number.size()-1]<<std::endl;
    file_merger_tot(run_number);
+   std::cout<<"File merger tot ok"<<std::endl;
+   Li_corrector(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1]);
+   std::cout<<"Li corrector ok"<<std::endl;
+   applied_Li_correction(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1]);
+   std::cout<<"applied_Li_correction ok"<<std::endl;
    Evolution_Li_SN_graph(run_number.size(),run_number[0],run_number[run_number.size()-1]);
-
+   std::cout<<"end"<<std::endl;
   return 0;
 }
 
