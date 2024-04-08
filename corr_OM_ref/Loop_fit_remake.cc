@@ -278,7 +278,7 @@ void Fit_Ref(int run_number, int run_number_pdf, int bins) {
 
     
     //recherche plus fine de chi2
-    for (int gain_count = gainmin - 400; gain_count < gainmin + 400; gain_count+=1) {
+    for (int gain_count = gainmin - 400; gain_count < gainmin + 400; gain_count+=10) {
       gain = (gain_bin_min + gain_bin_width*(gain_count-1));
       // if (gain < 1.01 && gain > 0.99) {
       modele = TH2modele->ProjectionY("modele", gain_count, gain_count);
@@ -418,8 +418,8 @@ void Fit_alpha_pdf(int run_number){
     
     TCanvas* canvas = new TCanvas;    
     if(om_number == 712 ){
-      TF1 *f_langaus = new TF1 ("f_langaus", langau_func, 5000, 12000, 6);      
-      f_langaus->SetParameters(240, 8700, 1.5e9, 600, 1e6, 6300);
+      TF1 *f_langaus = new TF1 ("f_langaus", langau_func, 5000, 11000, 6);      
+      f_langaus->SetParameters(240, 8700, 6e9, 600, 5e6, 6300);      
       spectre_om_pdf->Fit("f_langaus", "R");
       f_langaus->SetRange(f_langaus->GetParameter(1)-6*f_langaus->GetParameter(3), f_langaus->GetParameter(1)+4*f_langaus->GetParameter(3));
       spectre_om_pdf->Fit("f_langaus", "R");
@@ -472,7 +472,7 @@ void Fit_alpha(int run_number, int run_number_pdf){
   gStyle->SetLabelSize(0.03,"x");
   gStyle->SetLabelSize(0.03,"y");
   Load_spectre_alpha(run_number);  
-  double mean, mean_error, time, gain_error;
+  double mean, mean_error, time, gain_error_moins, gain_error_plus;
   int om_num, om_number;
   double gain;
   TFile file(Form("sortie/root_file_final/alpha_fit/Am_fit_%d.root", run_number), "RECREATE");
@@ -482,7 +482,8 @@ void Fit_alpha(int run_number, int run_number_pdf){
   Result_tree.Branch("mean_error", &mean_error);
   Result_tree.Branch("om_number", &om_num);
   Result_tree.Branch("gain", &gain);
-  Result_tree.Branch("gain_error", &gain_error);
+  Result_tree.Branch("gain_error_plus", &gain_error_plus);
+  Result_tree.Branch("gain_error_moins", &gain_error_moins);
   Result_tree.Branch("time", &time);
   gROOT->cd();
 
@@ -502,14 +503,15 @@ void Fit_alpha(int run_number, int run_number_pdf){
       mean = 0;
       mean_error=0;
       gain = 0;
-      gain_error=0;
+      gain_error_plus=0;
+      gain_error_moins = 0;
     }
     TH1D* spectre_om = NULL;
     spectre_om = spectre_charge(om_number);
     TCanvas* canvas = new TCanvas;    
     if(om_number == 712 ){
-      TF1 *f_langaus = new TF1 ("f_langaus", langau_func, 5000, 12000, 6);
-      f_langaus->SetParameters(240, 8700, 8e6, 600, 5000, 6300);
+      TF1 *f_langaus = new TF1 ("f_langaus", langau_func, 4000, 10000, 6);
+      f_langaus->SetParameters(240, 7200, 7e6, 600, 7000, 5000);
       spectre_om->Fit("f_langaus", "R");
       f_langaus->SetRange(f_langaus->GetParameter(1)-6*f_langaus->GetParameter(3), f_langaus->GetParameter(1)+4*f_langaus->GetParameter(3));
       spectre_om->Fit("f_langaus", "R");
@@ -527,7 +529,8 @@ void Fit_alpha(int run_number, int run_number_pdf){
       mean = f_langaus->GetParameter(1);
       mean_error = f_langaus->GetParError(1);
       gain = mean/mean_alpha_pdf[indice];
-      gain_error = gain * sqrt((mean_error/mean)*(mean_error/mean)+(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])*(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice]));
+      gain_error_plus = (gain * sqrt((mean_error/mean)*(mean_error/mean)+(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])*(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])))/2;
+      gain_error_moins = (gain * sqrt((mean_error/mean)*(mean_error/mean)+(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])*(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])))/2;
       om_num = om_number;
       Result_tree.Fill(); 
     }
@@ -551,7 +554,8 @@ void Fit_alpha(int run_number, int run_number_pdf){
       mean = f_langaus->GetParameter(1);
       mean_error = f_langaus->GetParError(1);
       gain = mean/mean_alpha_pdf[indice];
-      gain_error = gain * sqrt((mean_error/mean)*(mean_error/mean)+(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])*(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice]));
+      gain_error_plus = (gain * sqrt((mean_error/mean)*(mean_error/mean)+(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])*(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])))/2;
+      gain_error_moins = (gain * sqrt((mean_error/mean)*(mean_error/mean)+(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])*(mean_error_alpha_pdf[indice]/mean_alpha_pdf[indice])))/2;
       om_num=om_number;
       Result_tree.Fill();
     }
@@ -728,7 +732,7 @@ void file_merger(std::vector<int> run_number, int run_number_pdf, string previou
       gain_error_moins = 0/*0.0009755*/;
       gain_error_plus = 0/*0.0009755*/;
       int_run = run_number_pdf;
-      time = time_pdf/4;
+      time = time_pdf;
       Result_tree.Fill();
     }
   }
@@ -774,7 +778,7 @@ void file_merger(std::vector<int> run_number, int run_number_pdf, string previou
 
 void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string previous_file_s = "") {
   TFile file(Form("sortie/root_file_final/alpha_fit/Fit_Ref_%d-%d_alpha.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
-  double gain, gain_error, mean, mean_error;
+  double gain, gain_error_plus, gain_error_moins, mean, mean_error;
   int om_number, int_run;
   double time;
 
@@ -783,7 +787,8 @@ void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string p
   Result_tree.Branch("mean", &mean);
   Result_tree.Branch("mean_error", &mean_error);
   Result_tree.Branch("gain", &gain);
-  Result_tree.Branch("gain_error", &gain_error);
+  Result_tree.Branch("gain_error_plus", &gain_error_plus);
+  Result_tree.Branch("gain_error_moins", &gain_error_moins);
   Result_tree.Branch("run_number", &int_run);
   Result_tree.Branch("time", &time);
 
@@ -792,12 +797,12 @@ void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string p
     gain = 1;
     mean = mean_alpha_pdf[i-712];
     mean_error = mean_error_alpha_pdf[i-712];
-    gain_error = mean_error/mean;  
+    gain_error_plus = mean_error/(2*mean);
+    gain_error_moins = mean_error/(2*mean);	
     int_run = run_number_pdf;
     time = time_pdf;
     Result_tree.Fill();
   }
-  
 
   for (size_t i = 0; i < run_number.size(); i++) {
     TFile tree_file(Form("sortie/root_file_final/alpha_fit/Am_fit_%d.root", run_number.at(i)), "READ");
@@ -807,8 +812,10 @@ void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string p
     tree->SetBranchAddress("om_number", &om_number);
     tree->SetBranchStatus("gain",1);
     tree->SetBranchAddress("gain", &gain);
-    tree->SetBranchStatus("gain_error",1);
-    tree->SetBranchAddress("gain_error", &gain_error);
+    tree->SetBranchStatus("gain_error_plus",1);
+    tree->SetBranchAddress("gain_error_plus", &gain_error_plus);
+    tree->SetBranchStatus("gain_error_moins",1);
+    tree->SetBranchAddress("gain_error_moins", &gain_error_moins);
     tree->SetBranchStatus("run_number",1);
     tree->SetBranchAddress("run_number", &int_run);
     tree->SetBranchStatus("time",1);
@@ -870,9 +877,11 @@ void TGrapher(std::string file_name, int n_run){
   canvas->Divide(3,2);
   TGraphAsymmErrors *gain_graph[5]; //(n_run, xaxis, yaxis, xaxis_error_moins, xaxis_error_plus, yaxis_error_moins, yaxis_error_plus);
   TMultiGraph *mg[5];
+  TMultiGraph *mg_only[5];
   file.cd();
   for (int i = 0; i < 5; i++) {
     mg[i] = new TMultiGraph();
+    mg_only[i] = new TMultiGraph();
     for (int j = 0; j < n_run; j++){
       tree->GetEntry(i+j*5);
       yaxis[j] = gain;
@@ -896,6 +905,17 @@ void TGrapher(std::string file_name, int n_run){
     mg[i]->GetYaxis()->SetTitle("Gain evolution");
     mg[i]->GetYaxis()->SetRangeUser(0.9, 1.1);
     mg[i]->GetYaxis()->SetTitleOffset(0.9);
+
+    mg_only[i]->Add(gain_graph[i]);
+    mg_only[i]->SetName(Form("fit_OM_ref_%d", om_number));
+    mg_only[i]->SetNameTitle(Form("fit_OM_ref_%d", om_number), Form("Relative gain evolution of the ref OM %d measured with background spectra", om_number));
+    mg_only[i]->GetXaxis()->SetTimeDisplay(1);
+    mg_only[i]->GetXaxis()->SetTitle("Time");
+    mg_only[i]->GetYaxis()->SetTitle("Gain evolution");
+    mg_only[i]->GetYaxis()->SetRangeUser(0.9, 1.1);
+    mg_only[i]->GetYaxis()->SetTitleOffset(0.9);
+
+    
     if(i==2){      
       mg[i]->Draw("AP");
       
@@ -922,7 +942,7 @@ void TGrapher(std::string file_name, int n_run){
 
 
   /************************************************************************************************************************************************************************************************************************************************** WITH SHIFT METHOD BACKGROUND ONLY  *************************************************************************************************************************************************************************************************************************************************/
-
+  
 TFile tree_file2(Form("sortie/root_file_final/%s_bckg.root", file_name.c_str()), "READ");
   double time2;
   int om_number2, run_number2;
@@ -963,7 +983,7 @@ TFile tree_file2(Form("sortie/root_file_final/%s_bckg.root", file_name.c_str()),
         mg[i]->Draw("AP");
     }
     canvas->Update();
- 
+  
 
 
 
@@ -974,7 +994,7 @@ TFile tree_file2(Form("sortie/root_file_final/%s_bckg.root", file_name.c_str()),
  double time1;
  int om_number1, run_number1;
  double gain1;
- double gain_error1;
+ double gain_error_plus1, gain_error_moins1;
  vector<double> gain_store1;
  TTree* tree1 = (TTree*)tree_file1.Get("Result_tree");
  tree1->SetBranchStatus("*",0);
@@ -982,8 +1002,10 @@ TFile tree_file2(Form("sortie/root_file_final/%s_bckg.root", file_name.c_str()),
  tree1->SetBranchAddress("om_number", &om_number1);
  tree1->SetBranchStatus("gain",1);
  tree1->SetBranchAddress("gain", &gain1);
- tree1->SetBranchStatus("gain_error",1);
- tree1->SetBranchAddress("gain_error", &gain_error1);
+ tree1->SetBranchStatus("gain_error_plus",1);
+ tree1->SetBranchAddress("gain_error_plus", &gain_error_plus1);
+ tree1->SetBranchStatus("gain_error_moins",1);
+ tree1->SetBranchAddress("gain_error_moins", &gain_error_moins1);
  tree1->SetBranchStatus("run_number",1);
  tree1->SetBranchAddress("run_number", &run_number1);
  tree1->SetBranchStatus("time",1);
@@ -1008,8 +1030,8 @@ TFile tree_file2(Form("sortie/root_file_final/%s_bckg.root", file_name.c_str()),
      tree1->GetEntry(i+j*5);
      gain_store1.push_back(gain1);
      yaxis[j] = gain1;
-     yaxis_error_moins[j] = gain_error1/2;
-     yaxis_error_plus[j] = gain_error1/2;
+     yaxis_error_moins[j] = gain_error_plus1;
+     yaxis_error_plus[j] = gain_error_moins1;
      xaxis[j] = time1;
      xaxis_error_plus[j] = 0.00001;
      xaxis_error_moins[j] = 0.00001;
@@ -1283,6 +1305,7 @@ int main(int argc, char const *argv[]) {
     //
     file_merger(run_number,run_number_pdf,"","");
     std::cout << "file_merger ok" << '\n';
+
     
     string bckg = "_bckg";
     file_merger(run_number,run_number_pdf,"",bckg);
@@ -1290,7 +1313,7 @@ int main(int argc, char const *argv[]) {
     
     file_merger_alpha(run_number,run_number_pdf);
     std::cout << "file_merger_alpha ok" << '\n';
-    //
+    
     TGrapher(Form("Fit_Ref_%d-%d", run_number.at(0), run_number.at(run_number.size()-1)), n_run+1);
   }
   std::cout << "Finish !!!" << '\n';
