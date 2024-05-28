@@ -42,6 +42,9 @@
 
 using namespace std;
 
+//int vecteur_Bi[17] = {1090,1097,1105,1112,1119,1126,1133,1149,1156,1163,1170,1175,1180,1190,1195,1200,1205};
+int vecteur_Bi[15] = {1105,1112,1119,1126,1133,1149,1156,1163,1170,1175,1180,1190,1195,1200,1205};
+//int vecteur_Bi[1] = {1090};
 
 string namer(int om){    /////// name for the ref om for legend
   string name;
@@ -87,7 +90,7 @@ std::vector<double> time_measurer(int run_number){
     time_spectre->Fill(time);
   }
   // tree->Project("time_time_spectre", "time");
-  std::cout << Form("entree/root/snemo_run-%d_LI.root", run_number) << '\n';
+  //std::cout << Form("entree/root/snemo_run-%d_LI.root", run_number) << '\n';
   // time_spectre->Draw();
 
   int plus =0;
@@ -135,7 +138,6 @@ double* Ref_corrector(int run, string correction, double *gain_tab, double *gain
   
   //TFile file1(Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/root_file_final/Fit_Ref_%s.root", correction.c_str()), "READ");   //mini ou normal ?
   TFile file1(Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/root_file_final/Fit_Ref_%s.root", correction.c_str()), "READ");
-  std::cout<<"FILEEEE "<<Form("/home/granjon/Documents/these/Analyse/corr_OM_ref/sortie/root_file_final/Fit_Ref_%s.root", correction.c_str())<<std::endl;
 
   // std::cout << Form("calcul_gain_ref/root/Merged_Fit/Fit_Ref_%s.root", correction.c_str()) << '\n';
 
@@ -244,16 +246,18 @@ int bundle_number(int om_number){//associer un numero d'OM a un bundle
 
 
 void fit_Bi_energy(int run_number){
-  double chi2, mean_pic, mean_pic_error,time_bi;
-  int om_number;
+  double chi2, mean_pic, mean_pic_error,time_bi,ndf;
+  int om_number,nb_entries;
   TFile *file_create = new TFile(Form("~/Bi/sortie/result_run_Bi_%d.root",run_number), "RECREATE");
   TTree final_tree("final_tree","");
-  final_tree.Branch("chi2",&chi2);
+  final_tree.Branch("Chi2",&chi2);
   final_tree.Branch("om_number",&om_number);
   final_tree.Branch("run_number",&run_number);
   final_tree.Branch("mean_pic",&mean_pic);
   final_tree.Branch("mean_pic_error",&mean_pic_error);
   final_tree.Branch("time_bi",&time_bi);
+  final_tree.Branch("nb_entries",&nb_entries);
+  final_tree.Branch("ndf",&ndf);
 
   TFile *file = new TFile(Form("~/Bi/entree/fichier_Bi_%d.root",run_number), "READ");
   TTree* Result_tree = (TTree*)file->Get("arbre_alpha");
@@ -267,78 +271,119 @@ void fit_Bi_energy(int run_number){
   Result_tree->SetBranchAddress("nb_calo_touch", &nb_calo_touch);
   Result_tree->SetBranchStatus("om_num_elec",1);
   Result_tree->SetBranchAddress("om_num_elec", &om_num_elec);
-  Result_tree->SetBranchStatus("energy_elec",1);
-  Result_tree->SetBranchAddress("energy_elec", &energy_elec);
+  Result_tree->SetBranchStatus("charge_elec",1);
+  Result_tree->SetBranchAddress("charge_elec", &energy_elec);
   Result_tree->SetBranchStatus("time_bi",1);
   Result_tree->SetBranchAddress("time_bi", &time_bi);
-  
-  std::array<std::array<TH1D*,1>, 712> histograms;
+
+
+  std::array<TH1D*, 712> histograms;
+  int nb_bins = 500;
+  int max_charge = 60000;
+  int min_charge = 0;
   for(int i=0; i<712; i++){
-    histograms[i][0] = new TH1D(Form("om_%d",i),Form("om_%d",i),500,0,4);
+    histograms[i] = new TH1D(Form("om_%d",i),Form("om_%d",i),nb_bins,min_charge,max_charge);
   }
   
   for(int entry=0; entry<Result_tree->GetEntries();entry++){
     Result_tree->GetEntry(entry);
-    if(nb_calo_touch==1 && energy_elec->front()>0.7){
-      histograms[om_num_elec->front()][0]->Fill(energy_elec->front());
+    if(nb_calo_touch==1){
+      histograms[om_num_elec->front()]->Fill(energy_elec->front());
     }
   }
   
   int nb_down = 0, nb_pb_fit = 0, nb_good = 0;
-  TF1* f_MultipleGaus = new TF1 ("f_MultipleGaus","[0]*(7.11*TMath::Gaus(x[0],[1],[2]) + 1.84*TMath::Gaus(x[0],[1]*(1047.8/975.7),[2]*sqrt((1047.8/975.7))) + 0.44*TMath::Gaus(x[0],([1]*(1059.8/975.7)),[2]*sqrt((1059.8/975.7))))", 0.7, 1.5);
-  TH1D *chi2_hist = new TH1D("chi2_hist","chi2_hist",300,0,0);
+  TF1* f_MultipleGaus = new TF1 ("f_MultipleGaus","[0]*(7.11*TMath::Gaus(x[0],[1],[2]) + 1.84*TMath::Gaus(x[0],[1]*(1047.8/975.7),[2]*sqrt((1047.8/975.7))) + 0.44*TMath::Gaus(x[0],([1]*(1059.8/975.7)),[2]*sqrt((1059.8/975.7))))", 0, 60000);
+  TH1D *chi2_hist = new TH1D("chi2_hist","chi2_hist",200,0,0);
   file_create->cd();
   for(int i=0; i<712; i++){
     //fit                                                                                               
     //cout<<"hist"<<i<<endl;                                                                            
-    //cout<<histograms[i][0]->GetEntries()<<endl;                                                       
-    if(histograms[i][0]->GetEntries()>0){
-      TFitResultPtr fitResult;
-      for (int j = 0; j < 5; j++) {
+    //cout<<histograms[i][0]->GetEntries()<<endl;
+    nb_entries = histograms[i]->GetEntries();
+    if(histograms[i]->GetEntries()>500 && histograms[i]->GetMean()>0){
+      TFitResultPtr fitResult;      
+      for (int j = 0; j < 10; j++) {
         if(j!=0){
-          f_MultipleGaus->SetRange(f_MultipleGaus->GetParameter(1)-2*f_MultipleGaus->GetParameter(2), f_MultipleGaus->GetParameter(1)+3*f_MultipleGaus->GetParameter(2));
-          f_MultipleGaus->SetParLimits(100,2,0.5);
+	  f_MultipleGaus->SetParLimits(2, 800, 3000);
+	  f_MultipleGaus->SetParLimits(1,histograms[i]->GetMaximumBin()*(max_charge/nb_bins)-histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5,histograms[i]->GetMaximumBin()*(max_charge/nb_bins)+histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5);
+	    //4/5000 marche bien
+	    f_MultipleGaus->SetRange(f_MultipleGaus->GetParameter(1)-1*f_MultipleGaus->GetParameter(2), f_MultipleGaus->GetParameter(1)+3*f_MultipleGaus->GetParameter(2));
 	}
-	else{
-          f_MultipleGaus->SetParameters(25,1,0.0745);
+	else{//if first time
+          f_MultipleGaus->SetParameters(25,histograms[i]->GetMaximumBin()*(4/500),histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/10);
+	  //cout<<"first time "<<histograms[i]->GetMaximumBin()*(4/500.)<<" "<<histograms[i]->GetMaximumBin()*(4/500.)/10<<endl;
         }
         //histograms[i][0]->Fit(f_MultipleGaus, "RQ0");
-        fitResult = histograms[i][0]->Fit(f_MultipleGaus, "RQ0");
+        fitResult = histograms[i]->Fit(f_MultipleGaus, "RQ0");
       }
+      ndf = nb_bins*(f_MultipleGaus->GetParameter(1)+3*f_MultipleGaus->GetParameter(2)-(f_MultipleGaus->GetParameter(1)-1*f_MultipleGaus->GetParameter(2)))/max_charge; //500 bins de 0 a 4 MeV
       chi2_hist->Fill(f_MultipleGaus->GetChisquare());
+      TCanvas* canvas = new TCanvas(Form("om_%d",i), Form("om_%d",i), 800, 600);
       if(fitResult == 1){
-        //cout<<"histo"<<i<<"chi2 "<<f_MultipleGaus->GetChisquare()<<endl;	
-        nb_pb_fit++;
+	//cout<<"om"<<i<<endl;	
+        nb_pb_fit++;	
+        canvas->cd();
+        gStyle->SetOptFit(1111);
+        histograms[i]->Draw();
+	//canvas->SaveAs(Form("/home/granjon/Bi/histo/histo_%d.png",i));                     
+	canvas->Write();
+        canvas->Close();
+	om_number=i;
+        chi2 = 10000;
+	mean_pic = 0;
+	mean_pic_error = 0;
+	run_number = run_number;
+        time_bi = time_bi;
+	ndf = 1;
+        final_tree.Fill();
         //cout<<"hist "<<i<<"pb fit"<<endl;                                                             
       }
       else{
+	//cout<<" om bon"<<i<<endl;
         //cout<<"histo"<<i<<"chi2 "<<f_MultipleGaus->GetChisquare()<<endl;                              
-        nb_good++;
+        nb_good++;       
+	canvas->cd();
+	gStyle->SetOptFit(1111);
+	histograms[i]->Draw();
+	f_MultipleGaus->Draw("same");
+	gSystem->mkdir(Form("/home/granjon/Bi/histo/run_%d",run_number));
+	//canvas->SaveAs(Form("/home/granjon/Bi/histo/run_%d/histo_%d.png",run_number,i));             
+	canvas->Write();
+	canvas->Close();
+	om_number=i;
+	chi2 = f_MultipleGaus->GetChisquare();
+	mean_pic = f_MultipleGaus->GetParameter(1);
+	mean_pic_error = f_MultipleGaus->GetParError(1);
+	run_number = run_number;
+	time_bi = time_bi;
+	final_tree.Fill();
+	//histograms[i][0]->Write();                                                           
+
         //cout<<"hist "<<i<<"good"<<endl;                                                               
       }
     }
     else{
+      TCanvas* canvas = new TCanvas(Form("om_%d",i), Form("om_%d",i), 800, 600);
+      canvas->cd();
+      gStyle->SetOptFit(1111);
+      histograms[i]->Draw();
+      //canvas->SaveAs(Form("/home/granjon/Bi/histo/run_%d/histo_%d.png",run_number,i));
+      canvas->Write();
+      canvas->Close();
       f_MultipleGaus->SetParameters(0,0,0);
+      om_number=i;
+      chi2 = 2000;
+      ndf = 1;
+      run_number = run_number;
+      time_bi = time_bi;
+      mean_pic = 0;
+      mean_pic_error = 0;
+      final_tree.Fill();      
       //cout<<"hist without entry "<<i<<endl;                                                          
       nb_down++;
     }
-    // TCanvas* canvas = new TCanvas(Form("om_%d",i), Form("om_%d",i), 800, 600);
-    // canvas->cd();
-    // gStyle->SetOptFit(1111);
-    // histograms[i][0]->Draw();
-    // f_MultipleGaus->Draw("same");
-    //canvas->SaveAs(Form("histo/histo_%d.png",i));                                                  
-    //canvas->Write();
-    //canvas->Close();
-    om_number=i;
-    chi2 = f_MultipleGaus->GetChisquare();
-    mean_pic = f_MultipleGaus->GetParameter(1);
-    mean_pic_error = f_MultipleGaus->GetParError(1);
-    run_number = run_number;
-    time_bi = time_bi;
-    final_tree.Fill();
-    //histograms[i][0]->Write();                                                                       
-    histograms[i][0]->Delete();
+    	histograms[i]->Delete();
   }
   chi2_hist->Write();
   final_tree.Write();
@@ -359,14 +404,14 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
   TH2::SetDefaultSumw2();
   string wall=""; 
   TFile file(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number),"RECREATE");
-  std::cout<<"file open "<<Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number)<<std::endl;
+  //std::cout<<"file open "<<Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number)<<std::endl;
   
   
   std::vector<double> interval;
   interval = time_measurer(run_number);
-  for (size_t i = 0; i < interval.size(); i++) {
-    std::cout << "interval[" << i << "] = " << interval.at(i) << '\n';
-  }
+  // for (size_t i = 0; i < interval.size(); i++) {
+  //   std::cout << "interval[" << i << "] = " << interval.at(i) << '\n';
+  // }
   
   
   
@@ -600,15 +645,10 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
   
 
   TFile file(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/Amplitude_Li_run_%d.root", run_number),"RECREATE");
-
-  
   std::vector<double> interval;
   interval = time_measurer(run_number); // sert a conserver que les pics qui t'interesse -> plus de 4 pics car utilisation de led secondaires
   // plutot que de faire 4 fits -> on coupe en temps en fonction de la duree du fichier -> te donne les bornes a partir de quand on est dans premier pic, celui d'apres ... 
   
-  for (size_t i = 0; i < interval.size(); i++) {
-    std::cout << "interval[" << i << "] = " << interval.at(i) << '\n';
-  }
   // return;
   
   int om_number,bundle_ref;
@@ -639,7 +679,6 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
   Result_tree.Branch("bundle_ref", &bundle_ref);
   
   TCanvas* canvas = new TCanvas("canvas", "canvas", 800, 600);
-;
   TFile *tree_file = new TFile (Form("entree/root/snemo_run-%d_LI.root", run_number), "READ");
   double charge_tree;
   double amplitude_tree;
@@ -658,7 +697,6 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
   TParameter<double> *param = new TParameter<double>("start_time", time);
   param = (TParameter<double>*)(tree_file->Get("start_time"));
   start_time = param->GetVal();
-  std::cout << "time = " << start_time << '\n';
   gROOT->cd();
 
   std::array<std::array<TH1D*,8>, 5> histograms;
@@ -670,7 +708,7 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
 	wall = "FR";
       }
       pic = j;
-      histograms[i-712][j-1] = new TH1D(Form("om_%d_pic_%lu_%s",i,j,wall.c_str()),Form("om_%d_pic_%lu_%s",i,j,wall.c_str()),1000, 0, 180000);
+      histograms[i-712][j-1] = new TH1D(Form("om_%d_intensity_%lu_%s",i,j,wall.c_str()),Form("om_%d_intensity_%lu_%s",i,j,wall.c_str()),1000, 0, 180000);
     }
   }
 
@@ -687,10 +725,16 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
   
   int number = 712;
   int indice = 0;
+  double color[5] = {kBlack,kBlue,kGreen+1,kOrange-3,kRed};
   for(int om = number; om < number + 5; om+=1)
     {
-      for (size_t j = 1; j <  interval.size(); j++) 
-	{//boucle pour selection side
+      //si plot des 4 en meme temps
+      // TCanvas* c2 = new TCanvas("c2", "c2", 800, 600);
+      // TH1D *his = new TH1D(Form("om_%d",om),Form("om_%d",om),1000, 0, 120000);
+      // his->GetYaxis()->SetRangeUser(0,270);
+      // c2->cd();
+      // his->Draw();
+      for (size_t j = 1; j <  interval.size(); j++){//boucle pour selection side
 	  //std::cout<<"SIDE = "<<j<<" size "<< interval.size()<<std::endl;
 	  wall = "IT";
 	  if (j > interval.size()/2) {
@@ -771,21 +815,33 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
 	    f_Gaus->Draw("same");
 	    //std::cout<<"om"<<om<<endl;
 	    histograms[om-number][j-1]->GetXaxis()->SetRangeUser(mean-10*sigma,mean+10*sigma);
-	    	    	    
 	    if (om > 711 && run_number > 836) {	      
 	      std::cout<<"run num = "<< run_number<<endl;
-	      canvas->SaveAs(Form("sortie/ref_Li/fit_Li/om_%d/OM_%03d_pic_%d_run_%d%s%s.png", om, om, pic, run_number,wall.c_str(),corr.c_str()));
-	      
+	      canvas->SaveAs(Form("sortie/ref_Li/fit_Li/om_%d/OM_%03d_intensity_%d_run_%d%s%s.png", om, om, pic, run_number,wall.c_str(),corr.c_str()));	      
 	    }
+	    //si plot des 4 pics en meme temps
+	    // if(j<5){
+	    // c2->cd();
+	    // gStyle->SetOptFit(0);
+	    // gStyle->SetOptStat(1);
+	    // histograms[om-number][j-1]->Draw("sames");
+	    // TPaveStats *st = (TPaveStats*)histograms[om-number][j-1]->FindObject("stats");
+	    // st->SetY1NDC(1-(j-1)/5.-0.1);
+	    // st->SetY2NDC(1-(j-1)/5.+0.1);
+	    // st->SetLineColor(color[j]);
+	    // f_Gaus->SetLineColor(color[j]);
+	    // f_Gaus->Draw("same");
+	    // c2->Modified();
+	    // c2->Update();
+	    // c2->SaveAs(Form("test_dans_%d.root",j));
+	    // }
 	    bundle_ref = Ref_bundle_number(om, wall);
-	    Result_tree.Fill();
-	    
+	    Result_tree.Fill();	    
 	    delete histograms[om-number][j-1];
 	    delete f_Gaus;
 	  }
-	}
+      }
     }
-  std::cout << "time = " << start_time << '\n';
 
   file.cd();
   Result_tree.Write();
@@ -799,8 +855,7 @@ void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
   double Amplitude, Amplitude_error, Amplitude_corr, Amplitude_corr_error, Khi2, time, gain, gain_error;
   int om_number, run_number, pic,bundle_ref;
   string wall;
-  TFile *file_sortie = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/Li_corr_%d-%d.root",start,stop),"RECREATE");
-  std::cout<<"file create "<<Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/Li_corr_%d-%d.root",start,stop)<<std::endl;
+  TFile *file_sortie = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/Li_corr_%d-%d.root",start,stop),"RECREATE"); 
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("om_number", &om_number);
   Result_tree.Branch("pic", &pic);
@@ -974,8 +1029,8 @@ void applied_Li_correction(std::vector<int> run, int n_run, int start, int stop)
 
 void file_merger_Bi(std::vector<int> run){
  TFile *newfile = new TFile(Form("~/Bi/sortie/Merged_Bi_Fit_%d-%d.root", run[0],run[run.size()-1]), "RECREATE");
-  double mean_pic, mean_pic_error, Chi2, time_bi;
-  int om_number, run_number, pic, bundle;
+ double mean_pic, mean_pic_error, Chi2, time_bi, ndf;
+  int om_number, run_number, pic, bundle,nb_entries;
   TTree Result_tree("Result_tree","");
   Result_tree.Branch("om_number", &om_number);
   Result_tree.Branch("Chi2", &Chi2);
@@ -983,8 +1038,9 @@ void file_merger_Bi(std::vector<int> run){
   Result_tree.Branch("mean_pic_error", &mean_pic_error);
   Result_tree.Branch("run_number", &run_number);
   Result_tree.Branch("time_bi", &time_bi);
+  Result_tree.Branch("nb_entries",&nb_entries);
+  Result_tree.Branch("ndf",&ndf);
 
- 
   for (size_t j = 0; j < run.size(); j++) {
     TFile *file1 = new TFile(Form("~/Bi/sortie/result_run_Bi_%d.root",run[j]), "READ");    
     TTree* tree = (TTree*)file1->Get("final_tree");
@@ -1001,12 +1057,15 @@ void file_merger_Bi(std::vector<int> run){
     tree->SetBranchAddress("run_number", &run_number);
     tree->SetBranchStatus("time_bi",1);
     tree->SetBranchAddress("time_bi", &time_bi);
+    tree->SetBranchStatus("nb_entries",1);
+    tree->SetBranchAddress("nb_entries", &nb_entries);
+    tree->SetBranchStatus("ndf",1);
+    tree->SetBranchAddress("ndf", &ndf);
     
     for (int i = 0; i < tree->GetEntries(); i++) {
       tree->GetEntry(i);
       Result_tree.Fill();
     }
-
     file1->Close();
   }
   newfile->cd();
@@ -1130,7 +1189,6 @@ void file_merger(std::vector<int> run, int ref = 0, string addfile = "",string c
   Amplitude_error = 0;
 
   TFile *newfile = new TFile(Form("sortie/ref_Li/Fit_Ampl_Ref/Merged_Fit_%d-%d%s.root",run[0],run[run.size()-1],corr.c_str()), "RECREATE");
-  std::cout << "file saved : " << Form("sortie/ref_Li/Fit_Ampl_Ref/Merged_Fit_%d-%d.root",run[0],run[run.size()-1])<< '\n';
   newfile->cd();
   Result_tree.Write();
   newfile->Close();
@@ -1366,12 +1424,29 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   //plutot que multigraph tu peux dessiner les j pics de l'histo dans le meme canvas
   //Bi part
   int n_run_bi = run_bi.size();
+  double mean_pic_value[712][n_run_bi];
+  double mean_pic_value_error[712][n_run_bi];
   double mean_pic_vec[712][n_run_bi];
+  double Chi2_vec[712][n_run_bi];
+  double ndf_vec[712][n_run_bi];
+  int nb_entries_vec[712][n_run_bi];
   double mean_pic_error_vec[712][n_run_bi];
-  double mean_pic_error, mean_pic, time_bi, Chi2_bi;
-  int run_number_bi, om_number_bi, start_bi, srun_bi;
+  double mean_pic_error, mean_pic, time_bi, Chi2_bi, bi_relative, bi_relative_error,mean_pic_bi, mean_pic_bi_error,Chi2, ndf_bi, ndf;
+  int run_number_bi, om_number_bi, start_bi, srun_bi,nb_entries,nb_entries_bi;
   double time_vec_bi[n_run_bi];
   
+  TFile *bi_file = new TFile(Form("~/Bi/sortie/Bi_final_%d-%d.root",start,stop),"RECREATE");
+  TTree bi_tree("bi_tree","");
+  bi_tree.Branch("om_number_bi", &om_number_bi);
+  bi_tree.Branch("mean_pic_bi", &mean_pic_bi);
+  bi_tree.Branch("mean_pic_bi_error", &mean_pic_bi_error);
+  bi_tree.Branch("run_number_bi", &run_number_bi);
+  bi_tree.Branch("bi_relative",&bi_relative);
+  bi_tree.Branch("bi_relative_error",&bi_relative_error);
+  bi_tree.Branch("Chi2_bi",&Chi2_bi);
+  bi_tree.Branch("nb_entries_bi",&nb_entries_bi);
+  bi_tree.Branch("ndf_bi",&ndf_bi);
+
   TFile file_bi(Form("~/Bi/sortie/Merged_Bi_Fit_%d-%d.root",run_bi[0],run_bi[run_bi.size()-1]), "READ");
   TTree* tree_bi = (TTree*)file_bi.Get("Result_tree");
   tree_bi->SetBranchStatus("*",0);
@@ -1385,27 +1460,30 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   tree_bi->SetBranchAddress("om_number", &om_number_bi);
   tree_bi->SetBranchStatus("time_bi",1);
   tree_bi->SetBranchAddress("time_bi", &time_bi);
+  tree_bi->SetBranchStatus("Chi2",1);
+  tree_bi->SetBranchAddress("Chi2", &Chi2);
+  tree_bi->SetBranchStatus("nb_entries",1);
+  tree_bi->SetBranchAddress("nb_entries", &nb_entries);
+  tree_bi->SetBranchStatus("ndf",1);
+  tree_bi->SetBranchAddress("ndf", &ndf);
+
   int scompteur_bi=0;
   srun_bi = run_bi[0];
   for (int i = 0; i < tree_bi->GetEntries(); i++) {
     tree_bi->GetEntry(i);
     if(i==0){
       time_vec_bi[0]=time_bi;
-      cout<<"time ="<<time_bi<<endl;
     }
     if (run_number_bi != srun_bi) {
       srun_bi = run_number_bi;
       scompteur_bi++;
       time_vec_bi[scompteur_bi]=time_bi;
-      cout<<"time ="<<time_bi<<endl;
-    }
+    } 
       mean_pic_vec[om_number_bi][scompteur_bi] = mean_pic;
       mean_pic_error_vec[om_number_bi][scompteur_bi] = mean_pic_error;
-  }
-
-
-  for(double timet : time_vec_bi){
-    cout<<timet<<endl;
+      Chi2_vec[om_number_bi][scompteur_bi] = Chi2;      
+      nb_entries_vec[om_number_bi][scompteur_bi] = nb_entries;
+      ndf_vec[om_number_bi][scompteur_bi] = ndf;
   }
   
   double xaxis_bi[n_run_bi];
@@ -1418,32 +1496,54 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
     double max_x_bi = *std::max_element(xaxis_bi,xaxis_bi+n_run_bi);
 
     std::array<TGraphErrors*, 712> variation_bi_vec;
-    
+
     for (int i = 0; i < 712; i++) { //om num       
       double yaxis_bi[n_run_bi];
       double yaxis_error_bi[n_run_bi];
       for (int l = 0; l < n_run_bi; l++) {
 	if (mean_pic_vec[i][0] > 0.1){
 	  yaxis_bi[l] = mean_pic_vec[i][l]/mean_pic_vec[i][0];
-	  yaxis_error_bi[l] = sqrt(pow(mean_pic_error_vec[i][l]/mean_pic_vec[i][0],2) + pow(mean_pic_vec[i][l]*mean_pic_error_vec[i][0]/pow(mean_pic_vec[i][0],2),2)); 
-
+	  yaxis_error_bi[l] = sqrt(pow(mean_pic_error_vec[i][l]/mean_pic_vec[i][0],2) + pow(mean_pic_vec[i][l]*mean_pic_error_vec[i][0]/pow(mean_pic_vec[i][0],2),2));
+	  mean_pic_value[i][l] = mean_pic_vec[i][l]/mean_pic_vec[i][0];
+	  mean_pic_value_error[i][l] = sqrt(pow(mean_pic_error_vec[i][l]/mean_pic_vec[i][0],2) + pow(mean_pic_vec[i][l]*mean_pic_error_vec[i][0]/pow(mean_pic_vec[i][0],2),2));
+	  om_number_bi = i;
+	  mean_pic_bi = mean_pic_vec[i][l];
+	  mean_pic_bi_error = mean_pic_error_vec[i][l];
+	  run_number_bi = vecteur_Bi[l];
+	  bi_relative = mean_pic_value[i][l];
+	  bi_relative_error = mean_pic_value_error[i][l];
+	  Chi2_bi = Chi2_vec[i][l];
+	  ndf_bi = ndf_vec[i][l];
+	  nb_entries_bi=nb_entries_vec[i][l];
+	  //cout<<nb_entries_bi<<endl;
+	  bi_tree.Fill();
 	}
 	else{
-	  yaxis_bi[l] = 0;
-	  yaxis_error_bi[l] = 0;
+	  yaxis_bi[l]=0;
+	  yaxis_error_bi[l]=0;
+	  mean_pic_value[i][l] = 0;
+	  mean_pic_value_error[i][l] = 0;
+	  om_number_bi = i;
+	  mean_pic_bi = 0;
+	  mean_pic_bi_error = 0;
+	  run_number_bi = vecteur_Bi[l];
+	  bi_relative = 0;
+	  bi_relative_error = 0;
+	  Chi2_bi = Chi2_vec[i][l];	  
+	  nb_entries_bi=nb_entries_vec[i][l];
+	  ndf_bi = ndf_vec[i][l];
+	  bi_tree.Fill();	  
 	}
       }
       variation_bi_vec[i] = new TGraphErrors(n_run_bi, xaxis_bi, yaxis_bi, xaxis_error_bi, yaxis_error_bi);
       variation_bi_vec[i]->SetLineColor(kBlack);
       variation_bi_vec[i]->SetLineWidth(3);
       variation_bi_vec[i]->SetTitle("Bi 1 MeV pic");
-
     }
+    bi_file->cd();
+    bi_tree.Write();
+    bi_file->Close();
 
-    
-	  
-  
-  
   //Li part
   double amp_scor[712][4][n_run]; //om pic run
   double amp_scor_error[712][4][n_run];
@@ -1464,7 +1564,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   Result_tree.Branch("gain",&gain);
   Result_tree.Branch("gain_non_corr",&gain_non_corr);
   Result_tree.Branch("bundle",&bundle);
-
+  
   TFile file_cor(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/SN_gain_%d-%d.root",start,stop), "READ");
   TTree* tree_cor = (TTree*)file_cor.Get("Result_tree");
   tree_cor->SetBranchStatus("*",0);
@@ -1506,7 +1606,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
       amp_scor_error[om_number][pic-1][scompteur] = Amplitude_error;
       bundle_ref_vec[om_number][pic-1][scompteur] = bundle;
   }  
-   
+
   double norm_amp_cor[712][4][n_run];
   double norm_amp_cor_error[712][4][n_run];
   double norm_amp_scor[712][4][n_run];
@@ -1529,6 +1629,16 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 	  pic =j+1;
 	  Result_tree.Fill();
         }
+	else{
+          gain = 0;
+          gain_non_corr = 0;
+          run_number = run[l];
+          Amplitude = 0;
+          bundle = bundle_ref_vec[i][j][l];
+          om_number = i;
+          pic =j+1;
+          Result_tree.Fill();
+	}
       }
     }
   }
@@ -1541,17 +1651,17 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   }
     double min_x = *std::min_element(xaxis,xaxis+n_run);
     double max_x = *std::max_element(xaxis,xaxis+n_run);
-
+    
   for (int i = 0; i < 712; i++) { //om num
     TMultiGraph *multiGraph = new TMultiGraph(Form("om_%d",i),Form("om_%d",i));
-    TMultiGraph *multiGraph_amp = new TMultiGraph(Form("om_amp_%d",i),Form("om_amp_%d",i));
+    TMultiGraph *multiGraph_amp = new TMultiGraph(Form("om_amp_%d",i),Form("om_amp_%d",i));    
     multiGraph->GetYaxis()->SetTitle("Relative variation");
     multiGraph->GetXaxis()->SetTitle("date");
-    multiGraph_amp->GetYaxis()->SetTitle("Absolute variation");
-    multiGraph_amp->GetXaxis()->SetTitle("date");
     multiGraph->GetYaxis()->SetRangeUser(0.9,1.1);
     multiGraph->GetXaxis()->SetTimeDisplay(1);    
-    //multiGraph_amp->GetYaxis()->SetRangeUser(0.9,1.1);
+    multiGraph_amp->GetYaxis()->SetTitle("Absolute variation");
+    multiGraph_amp->GetXaxis()->SetTitle("date");
+    //multiGraph_amp->GetYaxis()->SetRangeUser(0.9,1.1);    
     multiGraph_amp->GetXaxis()->SetTimeDisplay(1);    
     //std::cout<<"min x = "<<min_x<<" max x "<<max_x<<std::endl;
     for (int j = 0; j < 4; j++) { // pic num
@@ -1575,13 +1685,21 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
           syaxis[l] = norm_amp_scor[i][j][l];
           syaxis_error[l] = norm_amp_scor_error[i][j][l];
         }
+	else{
+	  yaxis_amp[l] = 0;
+	  yaxis_error_amp[l]=0;
+	  yaxis_samp[l]=0;
+	  yaxis_error_samp[l]=0;
+	  yaxis[l]=0;
+	  yaxis_error[l]=0;
+	  syaxis[l]=0;
+	  syaxis_error[l]=0;
+	}	
       }
-    
       TGraphErrors *variation_scor = new TGraphErrors(n_run, xaxis, syaxis, xaxis_error, syaxis_error);
       TGraphErrors *variation_cor = new TGraphErrors(n_run, xaxis, yaxis, xaxis_error, yaxis_error);
       TGraphErrors *variation_amp = new TGraphErrors(n_run, xaxis, yaxis_amp, xaxis_error, yaxis_error_amp);
       TGraphErrors *variation_samp = new TGraphErrors(n_run, xaxis, yaxis_samp, xaxis_error, yaxis_error_samp);
-    
       variation_amp->SetLineColor(color[j+1]);
       variation_amp->SetLineWidth(2);
       variation_samp->SetLineColor(color[j+1]);
@@ -1597,14 +1715,14 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
       //variation_scor->SetTitle(Form("Intensity %d", j+1));
       variation_cor->SetLineColor(color[j+1]);
       variation_cor->SetLineWidth(2);
-      variation_cor->SetTitle(Form("Intensity %d", j+1));
+      variation_cor->SetTitle(Form("gain variation intensity %d", j+1));
       variation_cor->Draw("APL"/*"same"*/);
+      variation_scor->SetTitle(Form("charge variation intensity %d", j+1));
       variation_scor->Draw("APL"/*"same"*/);
       multiGraph->Add(variation_cor);
       multiGraph->Add(variation_scor);
       multiGraph_amp->Add(variation_amp);
       multiGraph_amp->Add(variation_samp);
-
     }//boucle j
     //cout<<variation_bi_vec[i]<<"histo"<<i<<endl;
     //multiGraph_amp->Add(variation_bi_vec[i]);    
@@ -1615,11 +1733,9 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
     multiGraph->GetXaxis()->SetLimits(min_x-10000,max_x+10000);
     //cout<<"multi"<<multiGraph<<endl;
     multiGraph->Write();
-
     multiGraph_amp->Write();
     variation_bi_vec[i]->Delete();
   }//boucle i
-
   Result_tree.Write();
   file_sortie->Close();
 }
@@ -1627,12 +1743,109 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 
 
 
+void comparaison_Bi_Li(int start, int stop){
+  double gain, gain_non_corr, bi_relative, bi_relative_error, li_relative, li_relative_error, diff_li_bi,Chi2,Chi2_bi, li_relative_non_corr, diff_li_bi_non_corr, shift_with_1, ndf_bi;
+  int bundle, run_number, pic, om_number, om_number_bi, om_number_li, pic_li,bundle_li, run_number_bi, run_number_li, nb_entries_bi;
+  bool is_before;
+
+  TFile *file_final = new TFile(Form("/home/granjon/Bi/sortie/Comparison_Bi_Li/final_comparison_%d-%d.root",start,stop),"RECREATE");
+  TTree Result_tree("Result_tree","");
+  Result_tree.Branch("om_number_bi", &om_number_bi);
+  Result_tree.Branch("om_number_li", &om_number_li);
+  Result_tree.Branch("pic_li", &pic_li);
+  Result_tree.Branch("bundle_li", &bundle_li);
+  Result_tree.Branch("run_number_li", &run_number_li);
+  Result_tree.Branch("run_number_bi", &run_number_bi);
+  Result_tree.Branch("bi_relative",&bi_relative);
+  Result_tree.Branch("bi_relative_error",&bi_relative_error);
+  Result_tree.Branch("li_relative",&li_relative);
+  Result_tree.Branch("li_relative_error",&li_relative_error);
+  Result_tree.Branch("li_relative_non_corr",&li_relative_non_corr);
+  Result_tree.Branch("diff_li_bi",&diff_li_bi);
+  Result_tree.Branch("is_before",&is_before);
+  Result_tree.Branch("Chi2_bi",&Chi2_bi);
+  Result_tree.Branch("nb_entries_bi",&nb_entries_bi);
+  Result_tree.Branch("diff_li_bi_non_corr",&diff_li_bi_non_corr);
+  Result_tree.Branch("shift_with_1",&shift_with_1);
+  Result_tree.Branch("ndf_bi",&ndf_bi);
+
+  
+  TFile file_cor(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/histo_graph_%d-%d.root",start,stop), "READ");    
+  TTree* tree_cor = (TTree*)file_cor.Get("Result_tree");
+  tree_cor->SetBranchStatus("*",0);
+  tree_cor->SetBranchStatus("gain",1);
+  tree_cor->SetBranchAddress("gain", &gain);
+  tree_cor->SetBranchStatus("gain_non_corr",1);
+  tree_cor->SetBranchAddress("gain_non_corr", &gain_non_corr);
+  tree_cor->SetBranchStatus("bundle",1);
+  tree_cor->SetBranchAddress("bundle", &bundle);
+  tree_cor->SetBranchStatus("run_number",1);
+  tree_cor->SetBranchAddress("run_number", &run_number);
+  tree_cor->SetBranchStatus("om_number",1);
+  tree_cor->SetBranchAddress("om_number", &om_number);
+  tree_cor->SetBranchStatus("pic",1);
+  tree_cor->SetBranchAddress("pic", &pic);
+
+  TFile file_bi(Form("~/Bi/sortie/Bi_final_%d-%d.root",start,stop), "READ");
+  TTree* tree = (TTree*)file_bi.Get("bi_tree");
+  tree->SetBranchStatus("*",0);
+  tree->SetBranchStatus("bi_relative",1);
+  tree->SetBranchAddress("bi_relative", &bi_relative);
+  tree->SetBranchStatus("bi_relative_error",1);
+  tree->SetBranchAddress("bi_relative_error", &bi_relative_error);
+  tree->SetBranchStatus("run_number_bi",1);
+  tree->SetBranchAddress("run_number_bi", &run_number_bi);
+  tree->SetBranchStatus("om_number_bi",1);
+  tree->SetBranchAddress("om_number_bi", &om_number_bi);
+  tree->SetBranchStatus("Chi2_bi",1);
+  tree->SetBranchAddress("Chi2_bi", &Chi2);
+  tree->SetBranchStatus("nb_entries_bi",1);
+  tree->SetBranchAddress("nb_entries_bi", &nb_entries_bi);
+  tree->SetBranchStatus("ndf_bi",1);
+  tree->SetBranchAddress("ndf_bi", &ndf_bi);
+
+ for (int j = 0; j < tree_cor->GetEntries(); j++) {
+    tree_cor->GetEntry(j);
+    for (int i = 0; i < tree->GetEntries(); i++) {
+      tree->GetEntry(i);
+      om_number_li = om_number;
+      om_number_bi = om_number_bi;
+      if(om_number_li==om_number_bi){
+	pic_li = pic;
+	bundle_li=bundle;
+	run_number_li = run_number;
+	run_number_bi = run_number_bi;
+	bi_relative = bi_relative;
+	li_relative = gain;
+	shift_with_1 = fabs(1-gain);
+	li_relative_non_corr = gain_non_corr;
+	Chi2_bi = Chi2;
+	nb_entries_bi = nb_entries_bi;
+	ndf_bi = ndf_bi;
+	diff_li_bi = 100*(li_relative-bi_relative)/bi_relative;	
+	diff_li_bi_non_corr = 100*(li_relative_non_corr-bi_relative)/bi_relative;
+	if(run_number_bi==run_number+2 || (run_number_bi == 1105 && run_number_li == 1102)){
+	  is_before = true;
+	  Result_tree.Fill();
+	}
+	else if(run_number_bi==run_number-1){
+	  is_before = false;
+	  Result_tree.Fill();
+	}     
+      }
+    }
+ }   
+ file_final->cd();
+ Result_tree.Write();
+ file_final->Close();
+}
+ 
 
 
 
 int main(int argc, char const *argv[]){
   int n_run, run;
-  std::vector<int> run_number, ref_run_number, ref_time, energy_run_number;
+  std::vector<int> ref_run_number, ref_time, energy_run_number/*, run_number*/;
   int compteur = 0;
   string file, ref_correction, calo_correction;
   bool add = false;
@@ -1649,6 +1862,17 @@ int main(int argc, char const *argv[]){
     }
   }
 
+
+  //Summer 2023 cara
+  //n_run = 29;
+  //int run_number_before[n_run] = {1088,1091,1095,1098,1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203};
+  n_run = 25;
+  int run_number_before[n_run] = {1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203};    
+  //n_run=1;
+  //int run_number_before[n_run] = {1091};
+    std::vector<int> run_number(run_number_before, run_number_before + n_run);
+    ref_correction = "1085-1165";
+  /*
   std::cout << "How many run do you want ?" << '\n';
   std::cin >> n_run;
   std::cout << "Write the runs you want" << '\n';
@@ -1673,17 +1897,16 @@ int main(int argc, char const *argv[]){
 
   std::cout << "Ref Correction file name ?" << '\n';
   std::cin >> ref_correction;
-  // std::cout << "Calo Correction file name ?" << '\n';
-  // std::cin >> calo_correction;
+  */
 
-  
+    
   double* ref_gain_tab_base = new double[5];
   double* ref_gain_tab = new double[5];
   double* ref_gain_tab_error = new double[5];
   double* ref_gain_tab_base_error = new double[5];
 
 
-  
+  cout<<run_number[0]<<endl;
   //rempli ref_gain_tab_base
   Ref_corrector(run_number[0], ref_correction, ref_gain_tab_base, ref_gain_tab_base_error);
   //tu corriges par rapport a un run qui n'est pas celui de refence 
@@ -1691,9 +1914,7 @@ int main(int argc, char const *argv[]){
   //Ref_correctrur = remplir tableau gain
   //le tableau est remplir pour le run 0 et pour les suivants
   //run 0 = ref
-  for (size_t i = 0; i < 5; i++) {
-   std::cout << "ref = " << ref_gain_tab_base[i] << '\n';
-  }
+
   compteur = 0;
   n_run = 0;
 
@@ -1707,31 +1928,28 @@ int main(int argc, char const *argv[]){
     // if (i > 0) {
     
     for (int j = 0; j < 5; j++) {
-      std::cout<<"ancien gain = "<<ref_gain_tab[j]<<std::endl;
         ref_gain_tab[j] = ref_gain_tab[j]/ref_gain_tab_base[j];
     	//On se refixe par rapport a une ref differente !!
     	//ref gain tab te donne la variation a corriger pour le run etudie (i)
         //cout << ref_gain_tab[j] << " - " << ref_gain_tab_base[j] << endl;
         ref_gain_tab_error[j] = sqrt(pow(ref_gain_tab_error[j]/ref_gain_tab_base[j],2) + pow(ref_gain_tab[j]*ref_gain_tab_base_error[j]/(pow(ref_gain_tab_base[j],2)),2));
     }
-     // }       
-    fit_LI_amplitude_Ref(run_number[i], ref_gain_tab, ref_gain_tab_error);
+     // }
     
-    //fit_LI_amplitude_Ref(run_number[i], ref_gain_tab, ref_gain_tab_error,"_sans_corr");
+    fit_LI_amplitude_Ref(run_number[i], ref_gain_tab, ref_gain_tab_error);        
 	
     std::cout << "fit LI amplitud Ref "<< run_number[i] << " is ok" << '\n';
   }
   
   if (add == false) {
-    file_merger(run_number, 1);
-    //file_merger(run_number, 1, file,"_sans_corr");//add peut etre pas bon
+    file_merger(run_number, 1);    
   }
   else{
     file_merger(run_number, 1, file);//add peut etre pas bon
   }
   Evolution_Li_ref_graph(run_number.size(),run_number[0],run_number[run_number.size()-1],"IT");
   Evolution_Li_ref_graph(run_number.size(),run_number[0],run_number[run_number.size()-1],"FR");
-  
+    
 
   
   
@@ -1740,7 +1958,6 @@ int main(int argc, char const *argv[]){
    std::cout << "" << '\n';
    std::cout << "START OF THE CALORIMETER FIT" << '\n';
    std::cout << "" << '\n';
-   int vecteur_Bi[17] = {1090,1097,1105,1112,1119,1126,1133,1149,1156,1163,1170,1175,1180,1190,1195,1200,1205};
    //int vecteur_Bi[2] = {1086,1090};
 
      for(int run_value : vecteur_Bi){
@@ -1754,7 +1971,7 @@ int main(int argc, char const *argv[]){
      
    for (size_t i = 0; i < run_number.size(); i++) {
      fit_LI_amplitude(run_number[i]);
-     std::cout<<"fit_LI_amplitude ok"<<std::endl;
+     std::cout<<"fit_LI_amplitude ok "<<run_number[i]<<std::endl;
    }
    //std::cout<<"ICI"<<run_number[0]<<" "<<run_number[run_number.size()-1]<<std::endl;
    file_merger_tot(run_number);
@@ -1764,6 +1981,9 @@ int main(int argc, char const *argv[]){
    applied_Li_correction(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1]);
    std::cout<<"applied_Li_correction ok"<<std::endl;
    Evolution_Li_SN_graph(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1],vecteur_Bi_vector);
+   std::cout<<"evolution Li ok"<<std::endl;
+   comparaison_Bi_Li(run_number[0],run_number[run_number.size()-1]);
+   cout<<"comparison ok"<<endl;
    std::cout<<"end"<<std::endl;
   return 0;
 }
