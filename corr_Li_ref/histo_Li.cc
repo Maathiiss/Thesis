@@ -34,6 +34,7 @@
 #include <TRandom3.h>
 #include <TLegend.h>
 #include <TParameter.h>
+#include <TSpectrum.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <TSystem.h>
@@ -41,10 +42,13 @@
 
 
 using namespace std;
-
+//summer 2023 cara
 //int vecteur_Bi[17] = {1090,1097,1105,1112,1119,1126,1133,1149,1156,1163,1170,1175,1180,1190,1195,1200,1205};
-int vecteur_Bi[15] = {1105,1112,1119,1126,1133,1149,1156,1163,1170,1175,1180,1190,1195,1200,1205};
-//int vecteur_Bi[1] = {1090};
+//int vecteur_Bi[15] = {1105,1112,1119,1126,1133,1149,1156,1163,1170,1175,1180,1190,1195,1200,1205};
+//int vecteur_Bi[1] = {1112};
+
+//March 2023 cara
+int vecteur_Bi[27] ={1274,1275,1276,1277,1281,1286,1287,1292,1297,1303,1313,1320,1326/*,1327*/,1337,1351,1359,1367,1374,1381,1389,1396,1403,1412,1413,1414,1415,1416};
 
 string namer(int om){    /////// name for the ref om for legend
   string name;
@@ -84,7 +88,7 @@ std::vector<double> time_measurer(int run_number){
   tree->SetBranchStatus("time",1);
   tree->SetBranchAddress("time", &time);
 
-  TH1D *time_spectre = new TH1D ("time_spectre", "", 1000, 0, 550);
+  TH1D *time_spectre = new TH1D ("time_spectre", "", 2000, 0, 1100);
   for (int i = 0; i < tree->GetEntries(); i++) {
     tree->GetEntry(i);
     time_spectre->Fill(time);
@@ -97,7 +101,7 @@ std::vector<double> time_measurer(int run_number){
   int moins = 0;
   std::vector<double> time_measurer;
   int i;
-  for (i = 0; i < 1000; i++) {
+  for (i = 0; i < 2000; i++) {
     if (time_spectre->GetBinContent(i) > 0) {
       plus = 1;
     }
@@ -142,15 +146,22 @@ double* Ref_corrector(int run, string correction, double *gain_tab, double *gain
   // std::cout << Form("calcul_gain_ref/root/Merged_Fit/Fit_Ref_%s.root", correction.c_str()) << '\n';
 
   int run_number;
-  double gain, gain_error_plus, gain_error_moins;
+  double gain, gain_error_plus, gain_error_moins ;
   TTree* tree = (TTree*)file1.Get("Result_tree");
   tree->SetBranchStatus("*",0);
-  tree->SetBranchStatus("gain",1);
-  tree->SetBranchAddress("gain", &gain);
-  tree->SetBranchStatus("gain_error_plus",1);
-  tree->SetBranchAddress("gain_error_plus", &gain_error_plus);
-  tree->SetBranchStatus("gain_error_moins",1);
-  tree->SetBranchAddress("gain_error_moins", &gain_error_moins);
+  // tree->SetBranchStatus("gain",1);
+  // tree->SetBranchAddress("gain", &gain);
+  // tree->SetBranchStatus("gain_error_plus",1);
+  // tree->SetBranchAddress("gain_error_plus", &gain_error_plus);
+  // tree->SetBranchStatus("gain_error_moins",1);
+  // tree->SetBranchAddress("gain_error_moins", &gain_error_moins);
+  //if pic only
+  tree->SetBranchStatus("gainmin",1);
+  tree->SetBranchAddress("gainmin", &gain);  
+  tree->SetBranchStatus("error_plus",1);
+  tree->SetBranchAddress("error_plus", &gain_error_plus);
+  tree->SetBranchStatus("error_moins",1);
+  tree->SetBranchAddress("error_moins", &gain_error_moins);  
   tree->SetBranchStatus("run_number",1);
   tree->SetBranchAddress("run_number", &run_number);
 
@@ -245,6 +256,60 @@ int bundle_number(int om_number){//associer un numero d'OM a un bundle
 
 
 
+
+void suivi_gamma(int run_number){
+  double mean_hist;
+  int om_number,nb_entries;
+  TFile *file_create = new TFile(Form("~/Bi/sortie/gamma/result_run_gamma_%d.root",run_number), "RECREATE");
+  TTree final_tree("final_tree","");
+  final_tree.Branch("om_number",&om_number);
+  final_tree.Branch("run_number",&run_number);
+  final_tree.Branch("mean_hist",&mean_hist);
+  final_tree.Branch("nb_entries",&nb_entries);
+
+  TFile *file = new TFile(Form("~/Bi/entree/fichier_gamma_%d.root",run_number), "READ");
+  TTree* Result_tree = (TTree*)file->Get("arbre_alpha");
+  std::vector<int> *om_num_elec = new std::vector<int>;
+  std::vector<double> *energy_elec = new std::vector<double>;
+  
+  gROOT->cd();
+  Result_tree->SetBranchStatus("*",0);
+  Result_tree->SetBranchStatus("om_num_elec",1);
+  Result_tree->SetBranchAddress("om_num_elec", &om_num_elec);
+  Result_tree->SetBranchStatus("charsge_elec",1);
+  Result_tree->SetBranchAddress("charge_elec", &energy_elec);
+
+  std::array<TH1D*, 712> histograms;
+  int nb_bins = 200;
+  int max_charge = 80000;
+  int min_charge = 0;
+  for(int i=0; i<712; i++){
+      histograms[i] = new TH1D(Form("om_%d",i),Form("om_%d",i),nb_bins,min_charge,max_charge);
+  }
+  
+  for(int entry=0; entry<Result_tree->GetEntries();entry++){
+    Result_tree->GetEntry(entry);
+    for(size_t i = 0; i < om_num_elec->size(); i++){
+    histograms[om_num_elec->at(i)]->Fill(energy_elec->at(i)); 
+    }
+  }
+    
+  for(int i=0; i<712; i++){
+    file_create->cd();
+    histograms[i]->Write();  
+    nb_entries = histograms[i]->GetEntries();
+    mean_hist = histograms[i]->GetMean();
+    om_number=i;
+    run_number = run_number;
+    final_tree.Fill();
+  }
+  final_tree.Write();
+  file_create->Close();
+}
+
+
+
+
 void fit_Bi_energy(int run_number){
   double chi2, mean_pic, mean_pic_error,time_bi,ndf;
   int om_number,nb_entries;
@@ -278,11 +343,16 @@ void fit_Bi_energy(int run_number){
 
 
   std::array<TH1D*, 712> histograms;
-  int nb_bins = 500;
+  int nb_bins = 200;
   int max_charge = 60000;
   int min_charge = 0;
   for(int i=0; i<712; i++){
+    if(i<520){
     histograms[i] = new TH1D(Form("om_%d",i),Form("om_%d",i),nb_bins,min_charge,max_charge);
+    }
+    else{
+      histograms[i] = new TH1D(Form("om_%d",i),Form("om_%d",i),nb_bins/2,min_charge,max_charge);
+    }
   }
   
   for(int entry=0; entry<Result_tree->GetEntries();entry++){
@@ -305,14 +375,25 @@ void fit_Bi_energy(int run_number){
       TFitResultPtr fitResult;      
       for (int j = 0; j < 10; j++) {
         if(j!=0){
-	  f_MultipleGaus->SetParLimits(2, 800, 3000);
+	  if(i==590 || i==318){
+	    cout<<histograms[i]->GetMaximumBin()*(max_charge/nb_bins)-histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5<<" autre borne "<<histograms[i]->GetMaximumBin()*(max_charge/nb_bins)+histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5<<endl;
+	  }
+	  f_MultipleGaus->SetParLimits(2, 800, 8000);
 	  f_MultipleGaus->SetParLimits(1,histograms[i]->GetMaximumBin()*(max_charge/nb_bins)-histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5,histograms[i]->GetMaximumBin()*(max_charge/nb_bins)+histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5);
+	  //cout<<"borne inf "<<histograms[i]->GetMaximumBin()*(max_charge/nb_bins)-histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5<<" borne sup"<<histograms[i]->GetMaximumBin()*(max_charge/nb_bins)+histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/5<<endl;
 	    //4/5000 marche bien
-	    f_MultipleGaus->SetRange(f_MultipleGaus->GetParameter(1)-1*f_MultipleGaus->GetParameter(2), f_MultipleGaus->GetParameter(1)+3*f_MultipleGaus->GetParameter(2));
+	  f_MultipleGaus->SetRange(f_MultipleGaus->GetParameter(1)-1*f_MultipleGaus->GetParameter(2), f_MultipleGaus->GetParameter(1)+3*f_MultipleGaus->GetParameter(2));
 	}
 	else{//if first time
-          f_MultipleGaus->SetParameters(25,histograms[i]->GetMaximumBin()*(4/500),histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/10);
-	  //cout<<"first time "<<histograms[i]->GetMaximumBin()*(4/500.)<<" "<<histograms[i]->GetMaximumBin()*(4/500.)/10<<endl;
+	  // TSpectrum spectrum;
+	  // if (spectrum.Search(histograms[i], 5, "", 0.2) == 2){
+	  // Double_t *xPeaks = spectrum.GetPositionX();
+	  // cout<<"histo "<<i<<"x peak 0 "<<xPeaks[0]<< "x peak 0 "<<xPeaks[1]<<endl;
+	  // }
+	  // else{
+          f_MultipleGaus->SetParameters(25,histograms[i]->GetMaximumBin()*(max_charge/nb_bins),histograms[i]->GetMaximumBin()*(max_charge/nb_bins)/10);
+	  //}
+	  TH1 *histogramCopy = (TH1*)histograms[i]->Clone(Form("om_%d",i));	  
         }
         //histograms[i][0]->Fit(f_MultipleGaus, "RQ0");
         fitResult = histograms[i]->Fit(f_MultipleGaus, "RQ0");
@@ -347,7 +428,8 @@ void fit_Bi_energy(int run_number){
 	gStyle->SetOptFit(1111);
 	histograms[i]->Draw();
 	f_MultipleGaus->Draw("same");
-	gSystem->mkdir(Form("/home/granjon/Bi/histo/run_%d",run_number));
+	histograms[i]->ShowPeaks(5, "", 0.2);
+	//gSystem->mkdir(Form("/home/granjon/Bi/histo/run_%d",run_number));
 	//canvas->SaveAs(Form("/home/granjon/Bi/histo/run_%d/histo_%d.png",run_number,i));             
 	canvas->Write();
 	canvas->Close();
@@ -402,6 +484,7 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
   gStyle->SetOptStat(1);
   TH1::SetDefaultSumw2();
   TH2::SetDefaultSumw2();
+
   string wall=""; 
   TFile file(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number),"RECREATE");
   //std::cout<<"file open "<<Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/Amplitude_Li_run_%d.root", run_number)<<std::endl;
@@ -412,7 +495,7 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
   // for (size_t i = 0; i < interval.size(); i++) {
   //   std::cout << "interval[" << i << "] = " << interval.at(i) << '\n';
   // }
-  
+
   
   
   int om_number=-1,bundle;
@@ -470,6 +553,7 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
   start_time = param->GetVal();
   gROOT->cd();
   bool with_palette = true;
+
   //sncalo = new sndisplay::calorimeter ("sndiplay_dis",with_palette);
   for(int i=0;i<712;i++){
     //std::cout<<"interval size"<<interval.size()<<std::endl;
@@ -477,6 +561,7 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
       //std::cout<<"j"<<j<<std::endl;
       histograms[i][j] = new TH1D(Form("om_%d_pic_%lu",i,j+1),Form("om_%d_pic_%lu",i,j+1),1000, 0, 180000);
       //std::cout<<histograms[i][j]<<std::endl;
+
     }
   }
   //std::cout<<"1 ici "<<std::endl;
@@ -485,7 +570,6 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
     wall="IT";
     tree->GetEntry(entry);
     if(om_number<712 && om_number>=0){
-      
       if ((om_number > 259 && om_number < 520) || (om_number > 583 && om_number < 647) || (om_number > 679 && om_number < 712) ) {
 	debut = debut+interval.size()/2;
 	wall="FR";
@@ -493,7 +577,7 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
       //std::cout<<"interval "<<interval.size()<<std::endl;
       for (size_t j = debut; j < debut + (interval.size()/2) ; j++){
 	if(time>interval.at(j) && time<interval.at(j+1) && amplitude_tree > 10){
-	  if(wall == "FR"){	    
+	  if(wall == "FR"){
 	    histograms[om_number][j-4]->Fill(charge_tree);
 	  }
 	  else{
@@ -504,7 +588,6 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
     }
   }
   
-  //std::cout<<"3 ici "<<std::endl;
   for(int om_number=0;om_number<712;om_number++){
     for (size_t j = 0; j <  interval.size()/2 ; j++){
       //file.cd();
@@ -1429,9 +1512,10 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   double mean_pic_vec[712][n_run_bi];
   double Chi2_vec[712][n_run_bi];
   double ndf_vec[712][n_run_bi];
+  double time_bi_vec[712][n_run_bi];
   int nb_entries_vec[712][n_run_bi];
   double mean_pic_error_vec[712][n_run_bi];
-  double mean_pic_error, mean_pic, time_bi, Chi2_bi, bi_relative, bi_relative_error,mean_pic_bi, mean_pic_bi_error,Chi2, ndf_bi, ndf;
+  double mean_pic_error, mean_pic, time_bi, Chi2_bi, bi_relative, bi_relative_error,mean_pic_bi, mean_pic_bi_error,Chi2, ndf_bi, ndf, time_bi_f;
   int run_number_bi, om_number_bi, start_bi, srun_bi,nb_entries,nb_entries_bi;
   double time_vec_bi[n_run_bi];
   
@@ -1446,6 +1530,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   bi_tree.Branch("Chi2_bi",&Chi2_bi);
   bi_tree.Branch("nb_entries_bi",&nb_entries_bi);
   bi_tree.Branch("ndf_bi",&ndf_bi);
+  bi_tree.Branch("time_bi_f",&time_bi_f);
 
   TFile file_bi(Form("~/Bi/sortie/Merged_Bi_Fit_%d-%d.root",run_bi[0],run_bi[run_bi.size()-1]), "READ");
   TTree* tree_bi = (TTree*)file_bi.Get("Result_tree");
@@ -1484,6 +1569,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
       Chi2_vec[om_number_bi][scompteur_bi] = Chi2;      
       nb_entries_vec[om_number_bi][scompteur_bi] = nb_entries;
       ndf_vec[om_number_bi][scompteur_bi] = ndf;
+      time_bi_vec[om_number_bi][scompteur_bi] = time_bi;
   }
   
   double xaxis_bi[n_run_bi];
@@ -1515,6 +1601,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 	  Chi2_bi = Chi2_vec[i][l];
 	  ndf_bi = ndf_vec[i][l];
 	  nb_entries_bi=nb_entries_vec[i][l];
+	  time_bi_f = time_bi_vec[i][l];
 	  //cout<<nb_entries_bi<<endl;
 	  bi_tree.Fill();
 	}
@@ -1524,7 +1611,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 	  mean_pic_value[i][l] = 0;
 	  mean_pic_value_error[i][l] = 0;
 	  om_number_bi = i;
-	  mean_pic_bi = 0;
+	  mean_pic_bi = mean_pic_vec[i][l];
 	  mean_pic_bi_error = 0;
 	  run_number_bi = vecteur_Bi[l];
 	  bi_relative = 0;
@@ -1532,6 +1619,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 	  Chi2_bi = Chi2_vec[i][l];	  
 	  nb_entries_bi=nb_entries_vec[i][l];
 	  ndf_bi = ndf_vec[i][l];
+	  time_bi_f = time_bi_vec[i][l];
 	  bi_tree.Fill();	  
 	}
       }
@@ -1549,9 +1637,10 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   double amp_scor_error[712][4][n_run];
   double amp_cor[712][4][n_run];
   double amp_cor_error[712][4][n_run];
-  double Amplitude_error, Amplitude, time, Amplitude_corr, Amplitude_corr_error, Khi2, gain, gain_non_corr;
+  double Amplitude_error, Amplitude, time, Amplitude_corr, Amplitude_corr_error, Khi2, gain, gain_non_corr, time_li;
   int run_number, om_number, pic, Ref_error, bundle;
   double time_vec[n_run];
+  double time_li_vec[712][4][n_run];
   int bundle_ref_vec[712][4][n_run];
   int srun = start;//mettre le premier run ??
   int scompteur = 0;
@@ -1564,7 +1653,8 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
   Result_tree.Branch("gain",&gain);
   Result_tree.Branch("gain_non_corr",&gain_non_corr);
   Result_tree.Branch("bundle",&bundle);
-  
+  Result_tree.Branch("time_li",&time_li);
+
   TFile file_cor(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/SN_gain_%d-%d.root",start,stop), "READ");
   TTree* tree_cor = (TTree*)file_cor.Get("Result_tree");
   tree_cor->SetBranchStatus("*",0);
@@ -1605,6 +1695,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
       amp_scor[om_number][pic-1][scompteur] = Amplitude;
       amp_scor_error[om_number][pic-1][scompteur] = Amplitude_error;
       bundle_ref_vec[om_number][pic-1][scompteur] = bundle;
+      time_li_vec[om_number][pic-1][scompteur] = time;
   }  
 
   double norm_amp_cor[712][4][n_run];
@@ -1623,8 +1714,9 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 	  gain = norm_amp_cor[i][j][l];
 	  gain_non_corr = norm_amp_scor[i][j][l];
 	  run_number = run[l];
-	  Amplitude = amp_scor[i][j][l];
+	  Amplitude = amp_cor[i][j][l];
 	  bundle = bundle_ref_vec[i][j][l];
+	  time_li = time_li_vec[i][j][l];
 	  om_number = i;
 	  pic =j+1;
 	  Result_tree.Fill();
@@ -1633,10 +1725,11 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
           gain = 0;
           gain_non_corr = 0;
           run_number = run[l];
-          Amplitude = 0;
+          Amplitude = amp_cor[i][j][l];
           bundle = bundle_ref_vec[i][j][l];
           om_number = i;
           pic =j+1;
+	  time_li = time_li_vec[i][j][l];		    
           Result_tree.Fill();
 	}
       }
@@ -1744,7 +1837,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
 
 
 void comparaison_Bi_Li(int start, int stop){
-  double gain, gain_non_corr, bi_relative, bi_relative_error, li_relative, li_relative_error, diff_li_bi,Chi2,Chi2_bi, li_relative_non_corr, diff_li_bi_non_corr, shift_with_1, ndf_bi;
+  double gain, gain_non_corr, bi_relative, bi_relative_error, li_relative, li_relative_error, diff_li_bi,Chi2,Chi2_bi, li_relative_non_corr, diff_li_bi_non_corr, shift_with_1, ndf_bi, time_li, time_bi,time_bi_f, mean_pic_bi, li_amplitude,Amplitude;
   int bundle, run_number, pic, om_number, om_number_bi, om_number_li, pic_li,bundle_li, run_number_bi, run_number_li, nb_entries_bi;
   bool is_before;
 
@@ -1768,7 +1861,11 @@ void comparaison_Bi_Li(int start, int stop){
   Result_tree.Branch("diff_li_bi_non_corr",&diff_li_bi_non_corr);
   Result_tree.Branch("shift_with_1",&shift_with_1);
   Result_tree.Branch("ndf_bi",&ndf_bi);
-
+  Result_tree.Branch("time_li",&time_li);
+  Result_tree.Branch("time_bi",&time_bi);
+  Result_tree.Branch("li_amplitude",&li_amplitude);
+  Result_tree.Branch("mean_pic_bi",&mean_pic_bi);
+  
   
   TFile file_cor(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/histo_graph_%d-%d.root",start,stop), "READ");    
   TTree* tree_cor = (TTree*)file_cor.Get("Result_tree");
@@ -1785,7 +1882,11 @@ void comparaison_Bi_Li(int start, int stop){
   tree_cor->SetBranchAddress("om_number", &om_number);
   tree_cor->SetBranchStatus("pic",1);
   tree_cor->SetBranchAddress("pic", &pic);
-
+  tree_cor->SetBranchStatus("time_li",1);
+  tree_cor->SetBranchAddress("time_li", &time_li);
+  tree_cor->SetBranchStatus("Amplitude",1);
+  tree_cor->SetBranchAddress("Amplitude", &Amplitude);
+ 
   TFile file_bi(Form("~/Bi/sortie/Bi_final_%d-%d.root",start,stop), "READ");
   TTree* tree = (TTree*)file_bi.Get("bi_tree");
   tree->SetBranchStatus("*",0);
@@ -1803,6 +1904,10 @@ void comparaison_Bi_Li(int start, int stop){
   tree->SetBranchAddress("nb_entries_bi", &nb_entries_bi);
   tree->SetBranchStatus("ndf_bi",1);
   tree->SetBranchAddress("ndf_bi", &ndf_bi);
+  tree->SetBranchStatus("time_bi_f",1);
+  tree->SetBranchAddress("time_bi_f", &time_bi_f);
+  tree->SetBranchStatus("mean_pic_bi",1);
+  tree->SetBranchAddress("mean_pic_bi", &mean_pic_bi);
 
  for (int j = 0; j < tree_cor->GetEntries(); j++) {
     tree_cor->GetEntry(j);
@@ -1822,16 +1927,25 @@ void comparaison_Bi_Li(int start, int stop){
 	Chi2_bi = Chi2;
 	nb_entries_bi = nb_entries_bi;
 	ndf_bi = ndf_bi;
+	time_li = time_li;
+	time_bi = time_bi_f;
+	mean_pic_bi = mean_pic_bi;
+	li_amplitude = Amplitude;
 	diff_li_bi = 100*(li_relative-bi_relative)/bi_relative;	
 	diff_li_bi_non_corr = 100*(li_relative_non_corr-bi_relative)/bi_relative;
-	if(run_number_bi==run_number+2 || (run_number_bi == 1105 && run_number_li == 1102)){
-	  is_before = true;
-	  Result_tree.Fill();
+	//March 2024 cara
+	if(run_number-run_number_bi<=4 || (run_number_bi == 1412 && run_number_li==1417)){
+	  Result_tree.Fill(); 
 	}
-	else if(run_number_bi==run_number-1){
-	  is_before = false;
-	  Result_tree.Fill();
-	}     
+	//summer cara
+	// if(run_number_bi==run_number+2 || (run_number_bi == 1105 && run_number_li == 1102)){
+	//   is_before = true;
+	//   Result_tree.Fill();
+	// }
+	// else if(run_number_bi==run_number-1){
+	//   is_before = false;
+	//   Result_tree.Fill();
+	// }     
       }
     }
  }   
@@ -1866,12 +1980,19 @@ int main(int argc, char const *argv[]){
   //Summer 2023 cara
   //n_run = 29;
   //int run_number_before[n_run] = {1088,1091,1095,1098,1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203};
-  n_run = 25;
-  int run_number_before[n_run] = {1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203};    
+  //n_run = 25;
+  //int run_number_before[n_run] = {1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203};
+  //ref_correction = "1102-1203";
+
+  //March 2024 cara
+  n_run = 19;
+  int run_number_before[n_run] = {1278,1282,1288,1293,1304,1314,1321,1328,1338,1352,1360,1362,1368,1375,1382,1390,1397,1406,1417};              
   //n_run=1;
   //int run_number_before[n_run] = {1091};
     std::vector<int> run_number(run_number_before, run_number_before + n_run);
-    ref_correction = "1085-1165";
+    //March correction
+    
+    ref_correction = "1231-1418_pic";
   /*
   std::cout << "How many run do you want ?" << '\n';
   std::cin >> n_run;
@@ -1898,7 +2019,7 @@ int main(int argc, char const *argv[]){
   std::cout << "Ref Correction file name ?" << '\n';
   std::cin >> ref_correction;
   */
-
+ 
     
   double* ref_gain_tab_base = new double[5];
   double* ref_gain_tab = new double[5];
@@ -1923,6 +2044,8 @@ int main(int argc, char const *argv[]){
   for (size_t i = 0; i < run_number.size(); i++) {
     //std::cout<<" ref corr" << ref_correction << " ref gain tab" << *ref_gain_tab << " ref gain tab error " << *ref_gain_tab_error<<endl;
     //rempli le ref_gain_tab
+
+
     Ref_corrector(run_number[i], ref_correction, ref_gain_tab, ref_gain_tab_error);    
     std::cout << "Ref_Corrector "<< run_number[i] << " is ok" << '\n';
     // if (i > 0) {
@@ -1958,7 +2081,6 @@ int main(int argc, char const *argv[]){
    std::cout << "" << '\n';
    std::cout << "START OF THE CALORIMETER FIT" << '\n';
    std::cout << "" << '\n';
-   //int vecteur_Bi[2] = {1086,1090};
 
      for(int run_value : vecteur_Bi){
      fit_Bi_energy(run_value);
@@ -1968,6 +2090,7 @@ int main(int argc, char const *argv[]){
      //changer vecteur statique en dynamique pour la fonction file_merger
      std::vector<int> vecteur_Bi_vector(std::begin(vecteur_Bi), std::end(vecteur_Bi));
      file_merger_Bi(vecteur_Bi_vector);
+     cout<<"merger Bi ok"<<endl;
      
    for (size_t i = 0; i < run_number.size(); i++) {
      fit_LI_amplitude(run_number[i]);
