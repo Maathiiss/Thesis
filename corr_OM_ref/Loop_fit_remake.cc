@@ -821,7 +821,7 @@ void file_merger(std::vector<int> run_number, int run_number_pdf, string previou
 
 
 void file_merger_alpha(std::vector<int> run_number, int run_number_pdf, string previous_file_s = "") {
-  TFile file(Form("sortie/root_file_final/alpha_fit/Fit_Ref_%d-%d_alpha.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
+  TFile file(Form("sortie/root_file_final/Fit_Ref_%d-%d_alpha.root", run_number.at(0), run_number.at(run_number.size()-1)), "RECREATE");
   double gain, gain_error_plus, gain_error_moins, mean, mean_error, Chi2, ndf;
   int om_number, int_run;
   double time;
@@ -1038,13 +1038,17 @@ int main(int argc, char const *argv[]) {
 
   }
   else {                            ///// Create new file
-    //n_run = 1;
-    n_run = 37;
-    //int run_number_before[n_run] = {1305,1315,1322,1329,1353,1361,1369,1376,1383,1391,1398,1407,1418};
-    int run_number_before[n_run] = {1231,1232,1233,1234,1235,1236,1237,1238,1239,1240,1241,1242,1243,1244,1245,1246,1252,1253,1254,1256,1279,1283,1289,1294,1305,1315,1322,1329,1353,1361,1369,1376,1383,1391,1398,1407,1418};
-    //int run_number_before[n_run] = {1329};
-    std::vector<int> run_number(run_number_before, run_number_before + n_run);
-    run_number_pdf = 1230;
+    //March 2024
+    // n_run = 37;
+    // int run_number_before[n_run] = {1231,1232,1233,1234,1235,1236,1237,1238,1239,1240,1241,1242,1243,1244,1245,1246,1252,1253,1254,1256,1279,1283,1289,1294,1305,1315,1322,1329,1353,1361,1369,1376,1383,1391,1398,1407,1418};
+    // std::vector<int> run_number(run_number_before, run_number_before + n_run);
+    // run_number_pdf = 1230;
+
+    //Total 2023/2024
+    n_run = 50;
+    int run_number_before[n_run] = {999, 1004, 1014, 1021, 1028, 1050, 1052, 1057, 1061, 1065, 1070, 1085,1089,1231,1232,1233,1234,1235,1236,1237,1238,1239,1240,1241,1242,1243,1244,1245,1246,1252,1253,1254,1256,1279,1283,1289,1294,1305,1315,1322,1329,1353,1361,1369,1376,1383,1391,1398,1407,1418};
+    std::vector<int> run_number(run_number_before, run_number_before + n_run);                        
+    run_number_pdf = 986; 
     
     // std::cout << "What is your run of pdf reference?" << '\n';
     // std::cin >> run_number_pdf;
@@ -1061,9 +1065,9 @@ int main(int argc, char const *argv[]) {
     std::cout << "Code start running" << '\n';
     for (int i = 0; i < n_run; i++) {
       //total shift
-      // Fit_Ref(run_number.at(i),run_number_pdf, 0,25);
-      // cout << Form("Fit_Ref_%d", run_number.at(i)) << endl;      
-      // minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
+      Fit_Ref(run_number.at(i),run_number_pdf, 0,25);
+      cout << Form("Fit_Ref_%d", run_number.at(i)) << endl;      
+      minerror_calculator(Form("Fit_Ref_%d", run_number.at(i)), run_number.at(i));
 
       // //without alpha pic shift
       // Fit_Ref(run_number.at(i),run_number_pdf, 0,55);
@@ -1071,32 +1075,33 @@ int main(int argc, char const *argv[]) {
       // minerror_calculator(Form("Fit_Ref_%d_bckg", run_number.at(i)), run_number.at(i));
 
       //only alpha pic shift
-      Fit_Ref(run_number.at(i),run_number_pdf, 25,55);
-      cout << Form("Fit_Ref_%d_pic", run_number.at(i)) << endl;
-      minerror_calculator(Form("Fit_Ref_%d_pic", run_number.at(i)), run_number.at(i));
+      // Fit_Ref(run_number.at(i),run_number_pdf, 25,55);
+      // cout << Form("Fit_Ref_%d_pic", run_number.at(i)) << endl;
+      // minerror_calculator(Form("Fit_Ref_%d_pic", run_number.at(i)), run_number.at(i));
 
       //alpha pic fit
-      //Fit_alpha_pdf(run_number_pdf); //to have the first value of the pic alpha
-      //Fit_alpha(run_number.at(i),run_number_pdf);
+      Fit_alpha_pdf(run_number_pdf); //to have the first value of the pic alpha
+      Fit_alpha(run_number.at(i),run_number_pdf);
+      
     }
 
     
     std::cout << "Fit_Ref and minerror ok" << '\n';
     //
-    // file_merger(run_number,run_number_pdf,"","");
-    // std::cout << "file_merger ok" << '\n';
+    file_merger(run_number,run_number_pdf,"","");
+    std::cout << "file_merger ok" << '\n';
 
     
     // string bckg = "_bckg";
     // file_merger(run_number,run_number_pdf,"",bckg);
     // std::cout << "file_merger bckg ok" << '\n';
     
-    string pic = "_pic";
-    file_merger(run_number,run_number_pdf,"",pic);
-    std::cout << "file_merger pic ok" << '\n';
+    // string pic = "_pic";
+    // file_merger(run_number,run_number_pdf,"",pic);
+    // std::cout << "file_merger pic ok" << '\n';
     
-    // file_merger_alpha(run_number,run_number_pdf);
-    // std::cout << "file_merger_alpha ok" << '\n';
+    file_merger_alpha(run_number,run_number_pdf);
+    std::cout << "file_merger_alpha ok" << '\n';
     //tree_creation(Form("Fit_Ref_%d-%d", run_number.at(0), run_number.at(run_number.size()-1)), n_run+1);
   }
   std::cout << "Finish !!!" << '\n';
