@@ -89,7 +89,7 @@ int intensity_chooser(int pic){  ///// to obtain intensity
   return intensity;
 }
 
-std::vector<double> time_measurer(int run_number){ // this function find the number of intensities -> when the time spectra goes to 0 -> we change our intensities
+std::vector<double> time_measurer(int run_number){ // this function find the number of intensities -> when the time spectra (number of counts in function of the time goes to 0 -> we change our intensities
   TFile tree_file(Form("entree/root/snemo_run-%d_LI.root", run_number), "READ");
   int om_number;
   double time = 0.0;
@@ -120,7 +120,6 @@ std::vector<double> time_measurer(int run_number){ // this function find the num
       time_measurer.push_back(time_spectre->GetBinCenter(i));
       plus = 0;
       moins = 0;
-      // std::cout << "time = " << time_spectre->GetBinCenter(i) << '\n';
     }
   }
   std::vector<double> interval;
@@ -526,8 +525,9 @@ void fit_Bi_energy(int run_number){
 
 
 
-void fit_LI_amplitude(int run_number){ //pour tout le calo
-  std::array<std::array<TH1D*,4>, 712> histograms; //712 OM et 4 pics
+void fit_LI_amplitude(int run_number, int nb_pics){ //pour tout le calo
+  //std::array<std::array<TH1D*,4>, 712> histograms; //712 OM et 4 pics
+  std::vector<std::vector<TH1D*>> histograms(712, std::vector<TH1D*>(nb_pics, nullptr));
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(1);
   TH1::SetDefaultSumw2();
@@ -626,7 +626,7 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
       for (size_t j = debut; j < debut + (interval.size()/2) ; j++){
 	if(time>interval.at(j) && time<interval.at(j+1) && amplitude_tree > 10){
 	  if(wall == "FR"){
-	    histograms[om_number][j-4]->Fill(charge_tree);
+	    histograms[om_number][j-nb_pics]->Fill(charge_tree);
 	  }
 	  else{
 	    histograms[om_number][j]->Fill(charge_tree);		      
@@ -788,9 +788,8 @@ void fit_LI_amplitude(int run_number){ //pour tout le calo
 
 
 
-void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_gain_table_error,string corr = ""){
+void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_gain_table_error, string corr = ""){
   //Fit amplitude LI des OM de ref corrige de leurs gains ->fit en charge
-  
   gStyle->SetOptFit(1);
   gStyle->SetOptStat(1);
   TH1::SetDefaultSumw2();
@@ -1007,7 +1006,7 @@ void fit_LI_amplitude_Ref(int run_number, double *ref_gain_table, double *ref_ga
 
 
 
-void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
+void Li_corrector(std::vector<int> run, int n_run, int start, int stop, int nb_pics){
   double Amplitude, Amplitude_error, Amplitude_corr, Amplitude_corr_error, Khi2, time, gain, gain_error;
   int om_number, run_number, pic,bundle_ref;
   string wall;
@@ -1024,11 +1023,11 @@ void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
   Result_tree.Branch("gain_error",&gain_error);
   Result_tree.Branch("bundle_ref",&bundle_ref);
   
-  double amp_scor[5][8][n_run];
-  double amp_scor_error[5][8][n_run];
-  double amp_cor[5][8][n_run];
-  double amp_cor_error[5][8][n_run];
-  int bundle_ref_vec[5][8][n_run];
+  double amp_scor[5][nb_pics][n_run];
+  double amp_scor_error[5][nb_pics][n_run];
+  double amp_cor[5][nb_pics][n_run];
+  double amp_cor_error[5][nb_pics][n_run];
+  int bundle_ref_vec[5][nb_pics][n_run];
   TFile *file = new TFile(Form("/home/granjon/Li/sortie/ref_Li/Fit_Ampl_Ref/Merged_Fit_%d-%d.root",start,stop), "READ");
   TTree* tree = (TTree*)file->Get("Result_tree");
   tree->SetBranchStatus("*",0);
@@ -1061,10 +1060,10 @@ void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
       scompteur++;
       srun = run_number;
     }
-    if(pic<5){
+    if(pic<(nb_pics/2+1)){
       wall = "IT";
     }
-    else if(pic>=5){
+    else if(pic>=(nb_pics/2+1)){
       wall = "FR";
     }
     amp_cor[om_number -712][pic-1][scompteur] = Amplitude_corr;
@@ -1076,7 +1075,7 @@ void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
 
    for (int l = 0; l < n_run; l++) {//run num
     for (int i = 0; i < 5; i++) {//om num    
-      for (int j = 0; j < 8; j++) {//pic num	
+      for (int j = 0; j < nb_pics; j++) {//pic num	
 	gain =  amp_cor[i][j][l]/amp_cor[i][j][0];//delta LED	  
 	gain_error = gain * sqrt((amp_cor_error[i][j][l]/amp_cor[i][j][l])*(amp_cor_error[i][j][l]/amp_cor[i][j][l]) + (amp_cor_error[i][j][0]/amp_cor[i][j][0])*(amp_cor_error[i][j][0]/amp_cor[i][j][0]));
 	if(l==0){gain_error = 0;}
@@ -1097,8 +1096,6 @@ void Li_corrector(std::vector<int> run, int n_run, int start, int stop){
    Result_tree.Write();
    file_sortie->Close();
 }
-
-
 
 
 
@@ -1164,12 +1161,7 @@ void applied_Li_correction(std::vector<int> run, int n_run, int start, int stop)
     tree_cor->GetEntry(j);    
     for (int i = 0; i < tree->GetEntries(); i++) {
       tree->GetEntry(i);
-      //std::cout<<"i = "<< i << " j = "<<j<<std::endl;
-      //std::cout<<"bundle " << bundle << " bundle ref "<<bundle_ref<<std::endl;
       if(pic_ref == pic && run_number == run_number_ref && bundle_ref == bundle){
-	// std::cout<<"run FIND" << run_number << " run ref "<<run_number_ref<<std::endl;
-	// std::cout<<"bundle FIND" << bundle << " bundle ref "<<bundle_ref<<std::endl;
-	// std::cout<<"pic FIND" << pic << " pic ref "<<pic_ref<<std::endl;
 	Amplitude_corr = Amplitude / gain;
 	Amplitude_corr_error =  Amplitude_corr * sqrt(pow(Amplitude_error/Amplitude,2) + pow(gain_error/gain,2));
 	Result_tree.Fill();
@@ -1357,12 +1349,12 @@ void file_merger(std::vector<int> run, int ref = 0, string addfile = "",string c
 
 
 
-void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string corr=""){//comparaison graph corrige et pas corrige
+void Evolution_Li_ref_graph(int n_run, int start, int stop, int nb_intensities ,string wall,string corr=""){//comparaison graph corrige et pas corrige
   gSystem->mkdir(Form("sortie/ref_Li/variation_ref/run_%d_%d",start,stop));
-  double amp_scor[5][8][n_run]; //always five because there are five ref OMs
-  double amp_scor_error[5][8][n_run];
-  double amp_cor[5][8][n_run];
-  double amp_cor_error[5][8][n_run];
+  double amp_scor[5][nb_intensities][n_run]; //always five because there are five ref OMs
+  double amp_scor_error[5][nb_intensities][n_run];
+  double amp_cor[5][nb_intensities][n_run];
+  double amp_cor_error[5][nb_intensities][n_run];
   double Amplitude_error, Amplitude, time, Amplitude_corr, Amplitude_corr_error;
   int run_number, om_number, pic, Ref_error;
   double time_vec[n_run];
@@ -1408,29 +1400,29 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
       srun = run_number;
       time_vec[scompteur]=time;
     }
-    if(wall=="IT" && pic<5){
+    if(wall=="IT" && pic<(nb_intensities/2)){
       amp_cor[om_number -712][pic-1][scompteur] = Amplitude_corr;
       amp_cor_error[om_number -712][pic-1][scompteur] = Amplitude_corr_error;
       amp_scor[om_number -712][pic-1][scompteur] = Amplitude;
       amp_scor_error[om_number -712][pic-1][scompteur] = Amplitude_error;
     }
-    else if(wall=="FR" && pic>=5){
+    else if(wall=="FR" && pic>=(nb_intensities/2)){
       //cout << "om " << om_number << " -> pic " << pic-5 << " run " << std::endl;
-      amp_cor[om_number -712][pic-5][scompteur] = Amplitude_corr;
-      amp_cor_error[om_number -712][pic-5][scompteur] = Amplitude_corr_error;      
-      amp_scor[om_number -712][pic-5][scompteur] = Amplitude;
-      amp_scor_error[om_number -712][pic-5][scompteur] = Amplitude_error;
+      amp_cor[om_number -712][pic-(nb_intensities/2)][scompteur] = Amplitude_corr;
+      amp_cor_error[om_number -712][pic-(nb_intensities/2)][scompteur] = Amplitude_corr_error;      
+      amp_scor[om_number -712][pic-(nb_intensities/2)][scompteur] = Amplitude;
+      amp_scor_error[om_number -712][pic-(nb_intensities/2)][scompteur] = Amplitude_error;
     }
   }
   
    
-  double norm_amp_cor[5][5][n_run];
-  double norm_amp_cor_error[5][5][n_run];
-  double norm_amp_scor[5][5][n_run];
-  double norm_amp_scor_error[5][5][n_run];
-  double color[5] = {kBlack,kBlue,kGreen+1,kOrange-3,kRed};
-  for (int i = 0; i < 5; i++) {//om num
-    for (int j = 0; j < 4; j++) {//pic num
+  double norm_amp_cor[5][nb_intensities/2][n_run]; // /2 because there are 2 times more intensities in the ref OMs than in the "normal" one
+  double norm_amp_cor_error[5][nb_intensities/2][n_run];
+  double norm_amp_scor[5][nb_intensities/2][n_run];
+  double norm_amp_scor_error[5][nb_intensities/2][n_run];
+  double color[5] = {kBlack,kBlue,kGreen+1,kOrange-3,kRed}; //change if more intensities than 4
+  for (int i = 0; i < 5; i++) {//om ref num
+    for (int j = 0; j < nb_intensities/2; j++) {//pic num
       for (int l = 0; l < n_run; l++) {//run num
         if (amp_cor[i][j][0] > 0.1 && amp_scor[i][j][0] > 0.1) {
           norm_amp_cor[i][j][l] = amp_cor[i][j][l]/amp_cor[i][j][0];
@@ -1463,13 +1455,12 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
   double max_x = *std::max_element(xaxis,xaxis+n_run);
   multiGraph->GetYaxis()->SetRangeUser(0.9,1.1);
   multiGraph->GetXaxis()->SetTimeDisplay(1);    
-  //multiGraph_amp->GetYaxis()->SetRangeUser(0.9,1.1);
   multiGraph_amp->GetXaxis()->SetTimeDisplay(1);    
 
   
   TLegend *legend = new TLegend(0.7,0.7,0.9,0.9);
   TLegend *legend2 = new TLegend(0.7,0.7,0.9,0.9);
-    for (int j = 0; j < 4; j++) { // pic num
+    for (int j = 0; j < nb_intensities/2; j++) { // pic num
       TCanvas* c = new TCanvas;
       double yaxis[n_run];
       double yaxis_error[n_run];
@@ -1489,7 +1480,6 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
           yaxis_error[l] = norm_amp_cor_error[i][j][l];	
           syaxis[l] = norm_amp_scor[i][j][l];
           syaxis_error[l] = norm_amp_scor_error[i][j][l];
-
         }
       }
       TGraphErrors *variation_scor = new TGraphErrors(n_run, xaxis, syaxis, xaxis_error, syaxis_error);
@@ -1502,12 +1492,9 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
       variation_samp->SetLineColor(color[j+1]);
       variation_samp->SetLineStyle(2);
       variation_samp->SetLineWidth(2);
-      
       legend2->AddEntry(variation_amp, Form("Intensity %d", j+1), "l");
       variation_amp->Draw("APL"/*"same"*/);
       variation_samp->Draw("same");
-
-      
       variation_scor->SetLineColor(color[j+1]);
       variation_scor->SetLineStyle(2);
       variation_scor->SetLineWidth(2);
@@ -1516,25 +1503,10 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
       legend->AddEntry(variation_cor, Form("Intensity %d", j+1), "l");
       variation_cor->Draw("APL"/*"same"*/);
       variation_scor->Draw("same");
-      //variation_cor->GetYaxis()->SetRangeUser(0.9,1.1);
-      //variation_cor->GetXaxis()->SetTimeDisplay(1);
-      //variation_cor->GetXaxis()->SetRangeUser(0,n_run);
-  
-  
-      //c->SaveAs(Form("sortie/ref_Li/variation_ref/variation_om_%d_pic_%d.png",712+i,j+1));
       multiGraph->Add(variation_cor);
       multiGraph->Add(variation_scor);
       multiGraph_amp->Add(variation_amp);
       multiGraph_amp->Add(variation_samp);
-      //variation_scor->SetTitle("test");
-      //variation_scor->SetName("test");
-      //variation_scor->SetNameTitle("test");
-      //TFile newfile(Form("sortie/ref_Li/variation_ref/variation_om_%d_pic_%d.root", 712+i,j),"RECREATE");
-
-      //newfile.cd();
-      //variation_scor->Write();
-      //variation_cor->Write();
-      //newfile.Close();
       c->Close();
     }
     TCanvas *c = new TCanvas("c", "Graphique", 1600, 600);
@@ -1543,9 +1515,7 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
     multiGraph_amp->GetXaxis()->SetNdivisions(520);
     multiGraph_amp->Draw("APL");
     multiGraph_amp->GetXaxis()->SetLimits(min_x-10000,max_x+10000);
-    //multiGraph_amp->GetYaxis()->UnZoom();
     c->Modified();
-
     
     TCanvas *canv = new TCanvas("canvas", "Graphique", 1600, 600);
     canv->cd();
@@ -1580,7 +1550,7 @@ void Evolution_Li_ref_graph(int n_run, int start, int stop,string wall,string co
 
 
 
-void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,std::vector<int> run_bi){//comparaison graph corrige et pas corrige
+void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,std::vector<int> run_bi,int nb_pics){//comparaison graph corrige et pas corrige
   //plutot que multigraph tu peux dessiner les j pics de l'histo dans le meme canvas
   //Bi part
   int n_run_bi = run_bi.size();
@@ -1710,15 +1680,15 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
     bi_file->Close();
 
   //Li part
-  double amp_scor[712][4][n_run]; //om pic run
-  double amp_scor_error[712][4][n_run];
-  double amp_cor[712][4][n_run];
-  double amp_cor_error[712][4][n_run];
+  double amp_scor[712][nb_pics][n_run]; //om pic run
+  double amp_scor_error[712][nb_pics][n_run];
+  double amp_cor[712][nb_pics][n_run];
+  double amp_cor_error[712][nb_pics][n_run];
   double Amplitude_error, Amplitude, time, Amplitude_corr, Amplitude_uncorr=0.0, Amplitude_corr_error, Khi2, gain, gain_non_corr, time_li;
   int run_number, om_number, pic, Ref_error, bundle;
   double time_vec[n_run];
-  double time_li_vec[712][4][n_run];
-  int bundle_ref_vec[712][4][n_run];
+  double time_li_vec[712][nb_pics][n_run];
+  int bundle_ref_vec[712][nb_pics][n_run];
   int srun = start;//mettre le premier run ??
   int scompteur = 0;
   TFile *file_sortie = new TFile(Form("/home/granjon/Li/sortie/SN_Li/Amplitude_Li/histo_graph_%d-%d.root",start,stop),"RECREATE");
@@ -1776,13 +1746,13 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
       time_li_vec[om_number][pic-1][scompteur] = time;
   }  
 
-  double norm_amp_cor[712][4][n_run];
-  double norm_amp_cor_error[712][4][n_run];
-  double norm_amp_scor[712][4][n_run];
-  double norm_amp_scor_error[712][4][n_run];
-  double color[5] = {kBlack,kBlue,kGreen+1,kOrange-3,kRed};
+  double norm_amp_cor[712][nb_pics][n_run];
+  double norm_amp_cor_error[712][nb_pics][n_run];
+  double norm_amp_scor[712][nb_pics][n_run];
+  double norm_amp_scor_error[712][nb_pics][n_run];
+  double color[5] = {kBlack,kBlue,kGreen+1,kOrange-3,kRed}; //change intensities
   for (int i = 0; i < 712; i++) {//om num
-    for (int j = 0; j < 4; j++) {//pic num
+    for (int j = 0; j < nb_pics; j++) {//pic num
       for (int l = 0; l < n_run; l++) {//run num
         if (amp_scor[i][j][0] > 0.1 && amp_cor[i][j][0] > 0.1 && amp_scor[i][j][l]>0.1 && amp_cor[i][j][0]>0.1) {
           norm_amp_cor[i][j][l] = amp_cor[i][j][l]/amp_cor[i][j][0]; //divide the run l by the first one to normalise
@@ -1831,7 +1801,7 @@ void Evolution_Li_SN_graph(std::vector<int> run, int n_run, int start, int stop,
     multiGraph->GetXaxis()->SetTitle("date");
     multiGraph->GetYaxis()->SetRangeUser(0.9,1.1);
     multiGraph->GetXaxis()->SetTimeDisplay(1);    
-    for (int j = 0; j < 4; j++) { // pic num
+    for (int j = 0; j < nb_pics; j++) { // pic num
       TCanvas* c = new TCanvas("","",1200, 600);                        
       double yaxis[n_run];
       double yaxis_error[n_run];
@@ -2028,7 +1998,8 @@ void comparaison_Bi_Li(int start, int stop, int stop_bi){
 
 
 int main(int argc, char const *argv[]){
-  int n_run, run;
+  
+  int n_run, run, nb_intensities;
   std::vector<int> ref_run_number, ref_time, energy_run_number/*, run_number*/;
   int compteur = 0;
   string file, ref_correction, calo_correction;
@@ -2073,8 +2044,8 @@ int main(int argc, char const *argv[]){
   //ref_correction = "1231-1418_alpha";
 
   //total 2023-2024 cara
-  n_run = 50;
-  int run_number_before[n_run] = {1049,/*1053 switch with the ref one*/1056,1088,1091,1095,1098,1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203, 1278,1282,1288,1293,1304,1314,1321,1328,1338,1352,1360,1362,1368,1375,1382,1390,1397,1406,1417};
+  n_run = 49;
+  int run_number_before[n_run] = {1049,/*1053 switch with the ref one*/1056,1088,1091,1095,/*1098 has no keys,*/1102,1106,1110,1113,1117,1120,1124,1127,1131,1134,1141,1144,1147,1150,1154,1157,1161,1164,1168,1173,1178,1188,1193,1198,1203, 1278,1282,1288,1293,1304,1314,1321,1328,1338,1352,1360,1362,1368,1375,1382,1390,1397,1406,1417};
   std::vector<int> run_number(run_number_before, run_number_before + n_run);
   ref_correction = "999-1418";
    
@@ -2100,11 +2071,15 @@ int main(int argc, char const *argv[]){
   std::cout << "Code start running" << '\n';
 
   for (size_t i = 0; i < run_number.size(); i++) {
-    //rempli le ref_gain_tab
+  //   //rempli le ref_gain_tab
+    if(i==0){
+      std::vector<double> interval;
+      interval = time_measurer(run_number[i]);
+      nb_intensities = interval.size()-1; //we assune that we have the same intensities number on all runs
+    }
+    cout<<" NB INTENSITE "<<nb_intensities<<endl;
     Ref_corrector(run_number[i], ref_correction, ref_gain_tab, ref_gain_tab_error);    
     std::cout << "Ref_Corrector "<< run_number[i] << " is ok" << '\n';
-    // if (i > 0) {
-    
     for (int j = 0; j < 5; j++) {
         ref_gain_tab[j] = ref_gain_tab[j]/ref_gain_tab_base[j];
     	//On se refixe par rapport a une ref differente !!
@@ -2122,8 +2097,8 @@ int main(int argc, char const *argv[]){
   else{
     file_merger(run_number, 1, file);//add peut etre pas bon
   }
-  Evolution_Li_ref_graph(run_number.size(),run_number[0],run_number[run_number.size()-1],"IT");
-  Evolution_Li_ref_graph(run_number.size(),run_number[0],run_number[run_number.size()-1],"FR");
+   Evolution_Li_ref_graph(run_number.size(),run_number[0],run_number[run_number.size()-1],nb_intensities,"IT");
+   Evolution_Li_ref_graph(run_number.size(),run_number[0],run_number[run_number.size()-1],nb_intensities,"FR");
     
   
   
@@ -2132,28 +2107,28 @@ int main(int argc, char const *argv[]){
    std::cout << "START OF THE CALORIMETER FIT" << '\n';
    std::cout << "" << '\n';
 
-     for(int run_value : vecteur_Bi){
+   for(int run_value : vecteur_Bi){
      fit_Bi_energy(run_value);
      std::cout<<"fit_BI ok "<<run_value<<std::endl;     
-     }
+   }
 
-     //changer vecteur statique en dynamique pour la fonction file_merger
-     std::vector<int> vecteur_Bi_vector(std::begin(vecteur_Bi), std::end(vecteur_Bi));
-     file_merger_Bi(vecteur_Bi_vector);
-     cout<<"merger Bi ok"<<endl;
-     cout<<"file "<<vecteur_Bi_vector[0]<<" - "<<vecteur_Bi_vector[vecteur_Bi_vector.size()-1] <<" created "<<endl;
-     
+   //changer vecteur statique en dynamique pour la fonction file_merger
+   std::vector<int> vecteur_Bi_vector(std::begin(vecteur_Bi), std::end(vecteur_Bi));
+   file_merger_Bi(vecteur_Bi_vector);
+   cout<<"merger Bi ok"<<endl;
+   cout<<"file "<<vecteur_Bi_vector[0]<<" - "<<vecteur_Bi_vector[vecteur_Bi_vector.size()-1] <<" created "<<endl;
+   
    for (size_t i = 0; i < run_number.size(); i++) {
-     fit_LI_amplitude(run_number[i]);
+     fit_LI_amplitude(run_number[i], nb_intensities/2);
      std::cout<<"fit_LI_amplitude ok "<<run_number[i]<<std::endl;
    }
    file_merger_tot(run_number);
    std::cout<<"File merger tot ok"<<std::endl;
-   Li_corrector(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1]);
+   Li_corrector(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1], nb_intensities);
    std::cout<<"Li corrector ok"<<std::endl;
    applied_Li_correction(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1]);
    std::cout<<"applied_Li_correction ok"<<std::endl;
-   Evolution_Li_SN_graph(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1],vecteur_Bi_vector);
+   Evolution_Li_SN_graph(run_number,run_number.size(),run_number[0],run_number[run_number.size()-1],vecteur_Bi_vector, nb_intensities/2);
    std::cout<<"evolution Li ok"<<std::endl;
    comparaison_Bi_Li(run_number[0],run_number[run_number.size()-1], vecteur_Bi[n_run_bi-1]);
    cout<<"comparison ok"<<endl;
